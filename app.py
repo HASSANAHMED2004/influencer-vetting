@@ -9,6 +9,7 @@ Run with:  streamlit run app.py
 from __future__ import annotations
 
 import os
+from datetime import UTC, datetime
 from io import BytesIO
 
 import pandas as pd
@@ -25,6 +26,7 @@ from vetting.frames import (
     style_dataframe,
     write_colored_xlsx,
 )
+from vetting.history import HistoryStore, RunMeta
 from vetting.scrapecreators import ScrapeCreatorsClient
 from vetting.youtube import YouTubeClient
 
@@ -117,6 +119,115 @@ def _legend() -> None:
                 'Rows that don\'t pass are left blank.</span>', unsafe_allow_html=True)
 
 
+@st.cache_resource
+def _history_store() -> HistoryStore | None:
+    """Connect to Supabase once (cached). None if it isn't configured."""
+    url, key = _secret("SUPABASE_URL"), _secret("SUPABASE_KEY")
+    if not url or not key:
+        return None
+    try:
+        return HistoryStore(url, key)
+    except Exception as exc:  # noqa: BLE001 - never let history break the app
+        st.warning(f"History unavailable: {exc}")
+        return None
+
+
+def _save_to_history(run_state: dict, start_row: int, end_row: int) -> None:
+    """Persist a finished run to Supabase (best-effort)."""
+    store = _history_store()
+    if store is None:
+        return
+    summary = color_summary(run_state["results"])
+    run_id = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
+    meta = {
+        "row_range": f"{start_row}–{end_row}",
+        "vetted": run_state["vetted"],
+        "passed": sum(summary.values()),
+        "breakdown": " · ".join(f"{k}: {v}" for k, v in summary.items()),
+    }
+    try:
+        store.save(run_id, run_state, meta)
+    except Exception as exc:  # noqa: BLE001
+        st.warning(f"Couldn't save this run to history: {exc}")
+
+
+def _fmt_ts(iso: str) -> str:
+    """Format a Supabase ISO timestamp as a friendly local-ish string."""
+    try:
+        return datetime.fromisoformat(iso).strftime("%b %d, %Y · %I:%M %p")
+    except ValueError:
+        return iso
+
+
+def _render_history_sidebar() -> None:
+    """Sidebar list of past runs with View / Delete controls."""
+    store = _history_store()
+    with st.sidebar:
+        st.markdown("### 📜 Run history")
+        if store is None:
+            st.caption("Set SUPABASE_URL and SUPABASE_KEY to save run history.")
+            return
+        try:
+            runs = store.list()
+        except Exception as exc:  # noqa: BLE001
+            st.warning(f"Couldn't load history: {exc}")
+            return
+        if not runs:
+            st.caption("No saved runs yet — run the vetting to create one.")
+            return
+        for run in runs:
+            _history_card(store, run)
+
+
+def _history_card(store: HistoryStore, run: RunMeta) -> None:
+    with st.container(border=True):
+        st.markdown(f"**{_fmt_ts(run.created_at)}**")
+        st.caption(f"Rows {run.row_range} · {run.vetted} vetted · {run.passed} passed")
+        if run.breakdown:
+            st.caption(run.breakdown)
+        col_view, col_del = st.columns(2)
+        if col_view.button("View", key=f"view_{run.id}", use_container_width=True):
+            st.session_state["run"] = store.load(run.id)
+            st.rerun()
+        if col_del.button("🗑 Delete", key=f"del_{run.id}", use_container_width=True):
+            store.delete(run.id)
+            st.session_state.pop("run", None)
+            st.rerun()
+
+
+def _render_run(run_state: dict | None) -> None:
+    """Render the stats, colored table and download button for a run."""
+    if run_state is None:
+        return
+    results = run_state["results"]
+    summary = color_summary(results)
+    passed = sum(summary.values())
+    st.markdown(
+        '<div class="statgrid">'
+        f'<div class="stat a"><div class="n">{passed:,}</div><div class="l">Passed</div></div>'
+        f'<div class="stat b"><div class="n">{run_state["vetted"]:,}</div>'
+        '<div class="l">Vetted</div></div>'
+        f'<div class="stat c"><div class="n">{run_state["total_rows"]:,}</div>'
+        '<div class="l">Total rows</div></div>'
+        '</div>', unsafe_allow_html=True,
+    )
+    if summary:
+        breakdown = _pills([(f"{label}: {n}", _LABEL_STYLE[label].fill,
+                             _LABEL_STYLE[label].font, "") for label, n in summary.items()])
+        st.markdown(f'<div style="margin:.3rem 0 .6rem">{breakdown}</div>',
+                    unsafe_allow_html=True)
+    # display_df is already string-cast so Streamlit's Arrow serializer can't
+    # choke on mixed-type columns (row positions are preserved).
+    st.dataframe(style_dataframe(run_state["display_df"], results),
+                 use_container_width=True, height=560)
+    st.download_button(
+        "⬇  Download annotated .xlsx",
+        data=run_state["annotated_xlsx"],
+        file_name="vetted_colored.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+
+
 _require_login()
 
 st.markdown(
@@ -137,87 +248,81 @@ with st.container(border=True):
                                  help="LinkedIn is the most credit-heavy platform and often "
                                       "unavailable (404s). Off by default.")
 
+# The upload + run flow only builds a run; rendering happens afterwards from
+# session_state, so a run "View"ed from history shows even without an upload.
 if uploaded is None:
-    st.info("⬆️ Upload an .xlsx to begin.")
-    st.stop()
+    st.info("⬆️ Upload an .xlsx to begin, or open a past run from the sidebar.")
+else:
+    raw_bytes = uploaded.getvalue()
+    df = pd.read_excel(BytesIO(raw_bytes)).reset_index(drop=True)
 
-raw_bytes = uploaded.getvalue()
-df = pd.read_excel(BytesIO(raw_bytes)).reset_index(drop=True)
+    try:
+        colmap = resolve_columns(df)
+    except MissingColumnsError as exc:
+        st.error(str(exc))
+        st.stop()
 
-try:
-    colmap = resolve_columns(df)
-except MissingColumnsError as exc:
-    st.error(str(exc))
-    st.stop()
-
-total_rows = len(df)
-matched = " · ".join(f"{k} → “{v}”" for k, v in colmap.items())
-st.markdown(
-    f'<span class="muted">✅ Loaded <b>{total_rows:,}</b> rows &nbsp;•&nbsp; {matched}</span>',
-    unsafe_allow_html=True,
-)
-
-if total_rows > 1:
-    start_row, end_row = st.slider(
-        "Rows to vet", 1, total_rows, (1, total_rows),
-        help="Only these rows are checked (saves API credits). Others stay blank.",
+    total_rows = len(df)
+    matched = " · ".join(f"{k} → “{v}”" for k, v in colmap.items())
+    st.markdown(
+        f'<span class="muted">✅ Loaded <b>{total_rows:,}</b> rows '
+        f'&nbsp;•&nbsp; {matched}</span>',
+        unsafe_allow_html=True,
     )
-else:
-    start_row, end_row = 1, total_rows
-st.markdown(f'<span class="muted">Will vet rows {start_row}–{end_row} '
-            f'({end_row - start_row + 1:,} rows).</span>', unsafe_allow_html=True)
 
-_legend()
-
-if not st.button("▶  Run vetting", type="primary"):
-    st.stop()
-
-run_df = df.iloc[start_row - 1:end_row]
-disabled_platforms = () if include_linkedin else ("linkedin",)
-
-# Build API clients from secrets (Streamlit Cloud) or environment (.env).
-youtube_client = None
-if yt_key := _secret("YOUTUBE_API_KEY"):
-    youtube_client = YouTubeClient(yt_key)
-else:
-    st.warning("No YOUTUBE_API_KEY set — YouTube will not be checked.")
-
-social_client = None
-if run_paid:
-    if sc_key := _secret("SCRAPECREATORS_API_KEY"):
-        social_client = ScrapeCreatorsClient(sc_key)
+    if total_rows > 1:
+        start_row, end_row = st.slider(
+            "Rows to vet", 1, total_rows, (1, total_rows),
+            help="Only these rows are checked (saves API credits). Others stay blank.",
+        )
     else:
-        st.warning("No SCRAPECREATORS_API_KEY set — paid checks skipped.")
+        start_row, end_row = 1, total_rows
+    st.markdown(f'<span class="muted">Will vet rows {start_row}–{end_row} '
+                f'({end_row - start_row + 1:,} rows).</span>', unsafe_allow_html=True)
 
-progress = st.progress(0.0, text="Vetting rows…")
-results = run_over_dataframe(
-    run_df, colmap,
-    youtube_client=youtube_client, social_client=social_client,
-    disabled_platforms=disabled_platforms,
-    progress=lambda f: progress.progress(f, text=f"Vetting rows… {int(f * 100)}%"),
-)
-progress.empty()
+    _legend()
 
-# --- Results ---
-summary = color_summary(results)
-passed = sum(summary.values())
-st.markdown(
-    '<div class="statgrid">'
-    f'<div class="stat a"><div class="n">{passed:,}</div><div class="l">Passed</div></div>'
-    f'<div class="stat b"><div class="n">{len(run_df):,}</div><div class="l">Vetted</div></div>'
-    f'<div class="stat c"><div class="n">{total_rows:,}</div><div class="l">Total rows</div></div>'
-    '</div>', unsafe_allow_html=True,
-)
-if summary:
-    breakdown = _pills([(f"{label}: {n}", _LABEL_STYLE[label].fill, _LABEL_STYLE[label].font, "")
-                        for label, n in summary.items()])
-    st.markdown(f'<div style="margin:.3rem 0 .6rem">{breakdown}</div>', unsafe_allow_html=True)
+    if st.button("▶  Run vetting", type="primary"):
+        run_df = df.iloc[start_row - 1:end_row]
+        disabled_platforms = () if include_linkedin else ("linkedin",)
 
-st.dataframe(style_dataframe(df, results), use_container_width=True, height=560)
+        # Build API clients from secrets (Streamlit Cloud) or environment (.env).
+        youtube_client = None
+        if yt_key := _secret("YOUTUBE_API_KEY"):
+            youtube_client = YouTubeClient(yt_key)
+        else:
+            st.warning("No YOUTUBE_API_KEY set — YouTube will not be checked.")
 
-st.download_button(
-    "⬇  Download annotated .xlsx",
-    data=write_colored_xlsx(raw_bytes, results),
-    file_name="vetted_colored.xlsx",
-    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-)
+        social_client = None
+        if run_paid:
+            if sc_key := _secret("SCRAPECREATORS_API_KEY"):
+                social_client = ScrapeCreatorsClient(sc_key)
+            else:
+                st.warning("No SCRAPECREATORS_API_KEY set — paid checks skipped.")
+
+        progress = st.progress(0.0, text="Vetting rows…")
+        results = run_over_dataframe(
+            run_df, colmap,
+            youtube_client=youtube_client, social_client=social_client,
+            disabled_platforms=disabled_platforms,
+            progress=lambda f: progress.progress(f, text=f"Vetting rows… {int(f * 100)}%"),
+        )
+        progress.empty()
+
+        # Store everything the results view needs so it survives Streamlit's
+        # rerun-on-every-interaction and can be re-loaded from history later.
+        run_state = {
+            "results": results,
+            "display_df": df.astype("string").fillna(""),
+            "annotated_xlsx": write_colored_xlsx(raw_bytes, results),
+            "vetted": len(run_df),
+            "total_rows": total_rows,
+        }
+        st.session_state["run"] = run_state
+        _save_to_history(run_state, start_row, end_row)
+
+# Sidebar history is rendered after the run block so a fresh run appears in it.
+_render_history_sidebar()
+
+# --- Results (from a fresh run, or one opened from history) ---
+_render_run(st.session_state.get("run"))
