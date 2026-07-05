@@ -1,0 +1,19 @@
+# Environments
+.venv/
+__pycache__/
+*.pyc
+
+# Secrets
+.env
+.streamlit/secrets.toml
+
+# Data & outputs (contains personal data — do not commit)
+*.xlsx
+*.xls
+*.csv
+!VETO.example.xlsx
+outputs/
+
+# Tooling
+.pytest_cache/
+.ruff_cache/

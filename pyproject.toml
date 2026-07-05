@@ -1,0 +1,28 @@
+[project]
+name = "influencer-vetting"
+version = "0.1.0"
+description = "Semi-automated vetting of social-media influencers from a spreadsheet."
+requires-python = ">=3.11"
+dependencies = [
+    "openpyxl>=3.1,<4",
+    "requests>=2.31,<3",
+    "python-dotenv>=1.0,<2",
+    "streamlit>=1.36,<2",
+    "pandas>=2.2,<3",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0,<9",
+    "ruff>=0.6,<1",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

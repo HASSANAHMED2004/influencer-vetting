@@ -1,0 +1,7 @@
+openpyxl<4,>=3.1
+requests<3,>=2.31
+python-dotenv<2,>=1.0
+
+[dev]
+pytest<9,>=8.0
+ruff<1,>=0.6
