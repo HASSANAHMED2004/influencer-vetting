@@ -95,7 +95,7 @@ class PlatformResult:
     handle: str | None = None
     followers: int | None = None
     # Primary averaged metric for the platform: median recent views for
-    # IG/TikTok, max video views for YouTube, median recent comments for LinkedIn.
+    # IG/TikTok, max video views for YouTube.
     avg_views: float | None = None
     verdict: Verdict = Verdict.SKIPPED
     note: str = ""
@@ -111,6 +111,5 @@ class RowResult:
     youtube: PlatformResult = field(default_factory=PlatformResult)
     instagram: PlatformResult = field(default_factory=PlatformResult)
     tiktok: PlatformResult = field(default_factory=PlatformResult)
-    linkedin: PlatformResult = field(default_factory=PlatformResult)
     overall: Verdict = Verdict.REVIEW
     notes: list[str] = field(default_factory=list)

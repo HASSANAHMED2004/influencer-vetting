@@ -21,20 +21,20 @@ from vetting.models import PlatformResult, RowResult, Verdict
 def test_resolve_columns_by_header_ignoring_extras_and_order():
     df = pd.DataFrame(columns=[
         "Email", "TikTok", "YouTube", "Your country/region",
-        "Instagram", "Linkedin", "Random Extra",
+        "Instagram", "Random Extra",
     ])
     colmap = resolve_columns(df)
     assert colmap == {
         "youtube": "YouTube", "instagram": "Instagram", "tiktok": "TikTok",
-        "linkedin": "Linkedin", "country": "Your country/region",
+        "country": "Your country/region",
     }
 
 
 def test_resolve_columns_missing_raises():
-    df = pd.DataFrame(columns=["YouTube", "Instagram", "TikTok"])  # no linkedin/country
+    df = pd.DataFrame(columns=["YouTube", "Instagram"])  # no tiktok/country
     with pytest.raises(MissingColumnsError) as exc:
         resolve_columns(df)
-    assert "linkedin" in str(exc.value) and "country" in str(exc.value)
+    assert "tiktok" in str(exc.value) and "country" in str(exc.value)
 
 
 def _result(index: int = 0, **verdicts) -> RowResult:
@@ -47,7 +47,6 @@ def _result(index: int = 0, **verdicts) -> RowResult:
 def test_row_style_single_platform_colors():
     assert row_style(_result(instagram=Verdict.PASS)) is PLATFORM_STYLES["instagram"]
     assert row_style(_result(youtube=Verdict.PASS)) is PLATFORM_STYLES["youtube"]
-    assert row_style(_result(linkedin=Verdict.PASS)) is PLATFORM_STYLES["linkedin"]
     assert row_style(_result(tiktok=Verdict.PASS)) is PLATFORM_STYLES["tiktok"]
 
 
@@ -66,7 +65,6 @@ def test_run_over_dataframe_free_mode_and_exclusion():
         "YouTube": ["chan", None],
         "Instagram": ["someone", "other"],
         "TikTok": [None, None],
-        "Linkedin": [None, None],
         "Your country/region": ["Spain", "India"],  # 2nd row excluded
     })
     colmap = resolve_columns(df)
@@ -82,7 +80,6 @@ def test_partial_run_preserves_original_positions():
         "YouTube": [None, None, None],
         "Instagram": ["a", "b", "c"],
         "TikTok": [None, None, None],
-        "Linkedin": [None, None, None],
         "Your country/region": ["Spain", "Spain", "Spain"],
     })
     colmap = resolve_columns(df)
@@ -122,7 +119,6 @@ def test_write_passing_xlsx_only_passing_rows_with_values_and_color():
         "YouTube": ["a", "b", "c"],
         "Instagram": ["x", "y", "z"],
         "TikTok": [None, None, None],
-        "Linkedin": [None, None, None],
         "Your country/region": ["Spain", "Spain", "Spain"],
     })
     buf = BytesIO()

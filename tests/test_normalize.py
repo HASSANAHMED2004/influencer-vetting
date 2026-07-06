@@ -8,7 +8,6 @@ from vetting.models import HandleStatus
 from vetting.normalize import (
     is_filtered_country,
     normalize_instagram,
-    normalize_linkedin,
     normalize_tiktok,
     normalize_youtube,
 )
@@ -76,34 +75,6 @@ def test_youtube_refs(raw, expected_ref):
     result = normalize_youtube(raw)
     assert result.status is HandleStatus.OK
     assert result.value == expected_ref
-
-
-@pytest.mark.parametrize(
-    "raw,expected,url",
-    [
-        ("https://www.linkedin.com/in/jane-doe-12345/", "jane-doe-12345",
-         "https://www.linkedin.com/in/jane-doe-12345"),
-        ("https://uk.linkedin.com/in/John-Smith", "john-smith",
-         "https://www.linkedin.com/in/john-smith"),
-        ("https://www.linkedin.com/company/acme-corp", "acme-corp",
-         "https://www.linkedin.com/company/acme-corp"),
-    ],
-)
-def test_linkedin_resolves(raw, expected, url):
-    result = normalize_linkedin(raw)
-    assert result.status is HandleStatus.OK
-    assert result.value == expected
-    assert result.url == url
-
-
-@pytest.mark.parametrize("raw", ["", "NA", None])
-def test_linkedin_missing(raw):
-    assert normalize_linkedin(raw).status is HandleStatus.MISSING
-
-
-@pytest.mark.parametrize("raw", ["https://linktr.ee/x", "https://example.com/in/x"])
-def test_linkedin_unresolvable(raw):
-    assert normalize_linkedin(raw).status is HandleStatus.UNRESOLVABLE
 
 
 @pytest.mark.parametrize(

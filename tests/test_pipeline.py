@@ -14,7 +14,6 @@ class FakeRow:
     youtube: object = None
     instagram: object = None
     tiktok: object = None
-    linkedin: object = None
     country: object = None
 
 
@@ -64,9 +63,9 @@ class FakeYouTube:
 class FakeSocial:
     """Records which paid platforms were actually called."""
 
-    def __init__(self, ig=Verdict.FAIL, tt=Verdict.FAIL, li=Verdict.FAIL):
+    def __init__(self, ig=Verdict.FAIL, tt=Verdict.FAIL):
         self.calls: list[str] = []
-        self._verdicts = {"instagram": ig, "tiktok": tt, "linkedin": li}
+        self._verdicts = {"instagram": ig, "tiktok": tt}
 
     def _call(self, platform, handle):
         self.calls.append(platform)
@@ -78,50 +77,46 @@ class FakeSocial:
     def check_tiktok(self, handle, *, now):
         return self._call("tiktok", handle)
 
-    def check_linkedin(self, handle, *, now):
-        return self._call("linkedin", handle)
-
 
 def _full_row():
     return FakeRow(2, youtube="chan", instagram="ig_user", tiktok="tt_user",
-                   linkedin="https://www.linkedin.com/in/john-doe", country="Spain")
+                   country="Spain")
 
 
-def test_instagram_pass_short_circuits_tiktok_and_linkedin():
+def test_instagram_pass_short_circuits_tiktok():
     social = FakeSocial(ig=Verdict.PASS)
     result = process_row(_full_row(), youtube_client=FakeYouTube(Verdict.FAIL),
                          social_client=social)
     assert result.overall is Verdict.PASS
-    assert social.calls == ["instagram"]  # tiktok/linkedin never called
+    assert social.calls == ["instagram"]  # tiktok never called
     assert result.tiktok.note == "not checked (already qualified)"
-    assert result.linkedin.note == "not checked (already qualified)"
 
 
 def test_youtube_pass_does_not_skip_paid_chain():
     # YouTube runs side by side: even though it passes, the paid chain still runs.
-    social = FakeSocial(ig=Verdict.FAIL, tt=Verdict.FAIL, li=Verdict.FAIL)
+    social = FakeSocial(ig=Verdict.FAIL, tt=Verdict.FAIL)
     result = process_row(_full_row(), youtube_client=FakeYouTube(Verdict.PASS),
                          social_client=social)
     assert result.overall is Verdict.PASS  # YouTube alone qualifies it
-    assert social.calls == ["instagram", "tiktok", "linkedin"]  # all still checked
+    assert social.calls == ["instagram", "tiktok"]  # both still checked
 
 
 def test_disabled_platform_is_never_called():
-    social = FakeSocial(ig=Verdict.FAIL, tt=Verdict.FAIL, li=Verdict.PASS)
+    social = FakeSocial(ig=Verdict.FAIL, tt=Verdict.PASS)
     result = process_row(_full_row(), youtube_client=FakeYouTube(Verdict.FAIL),
-                         social_client=social, disabled_platforms=("linkedin",))
-    assert "linkedin" not in social.calls  # never called
-    assert result.linkedin.verdict is Verdict.SKIPPED
-    assert result.linkedin.note == "linkedin disabled"
-    assert result.overall is Verdict.FAIL  # LI would've passed, but it's off
+                         social_client=social, disabled_platforms=("tiktok",))
+    assert "tiktok" not in social.calls  # never called
+    assert result.tiktok.verdict is Verdict.SKIPPED
+    assert result.tiktok.note == "tiktok disabled"
+    assert result.overall is Verdict.FAIL  # TikTok would've passed, but it's off
 
 
-def test_falls_through_to_linkedin_when_others_fail():
-    social = FakeSocial(ig=Verdict.FAIL, tt=Verdict.FAIL, li=Verdict.PASS)
+def test_falls_through_to_tiktok_when_instagram_fails():
+    social = FakeSocial(ig=Verdict.FAIL, tt=Verdict.PASS)
     result = process_row(_full_row(), youtube_client=FakeYouTube(Verdict.FAIL),
                          social_client=social)
     assert result.overall is Verdict.PASS
-    assert social.calls == ["instagram", "tiktok", "linkedin"]  # tried in order
+    assert social.calls == ["instagram", "tiktok"]  # tried in order
 
 
 def test_decide_overall_any_platform():

@@ -24,7 +24,6 @@ REQUIRED_COLUMNS: dict[str, str] = {
     "youtube": "youtube",
     "instagram": "instagram",
     "tiktok": "tiktok",
-    "linkedin": "linkedin",
     "country": "country",
 }
 
@@ -42,7 +41,6 @@ class RowStyle:
 PLATFORM_STYLES: dict[str, RowStyle] = {
     "instagram": RowStyle("Instagram", "#800080", "#FFFFFF"),  # purple
     "youtube": RowStyle("YouTube", "#FF0000", "#FFFFFF"),  # red
-    "linkedin": RowStyle("LinkedIn", "#0000FF", "#FFFFFF"),  # blue
     "tiktok": RowStyle("TikTok", "#000000", "#FFFFFF"),  # black
 }
 MULTI_STYLE = RowStyle("Multiple platforms", "#FFFF00", "#000000")  # yellow
@@ -86,7 +84,6 @@ class _DFRow:
     youtube: object
     instagram: object
     tiktok: object
-    linkedin: object
     country: object
 
 
@@ -114,7 +111,6 @@ def run_over_dataframe(
             youtube=_cell(row[colmap["youtube"]]),
             instagram=_cell(row[colmap["instagram"]]),
             tiktok=_cell(row[colmap["tiktok"]]),
-            linkedin=_cell(row[colmap["linkedin"]]),
             country=_cell(row[colmap["country"]]),
         )
         results.append(process_row(
@@ -133,7 +129,6 @@ def passed_platforms(result: RowResult) -> list[str]:
         ("youtube", result.youtube),
         ("instagram", result.instagram),
         ("tiktok", result.tiktok),
-        ("linkedin", result.linkedin),
     )
     return [name for name, pr in pairs if pr.verdict is Verdict.PASS]
 

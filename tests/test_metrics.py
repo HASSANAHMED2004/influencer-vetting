@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
-from vetting.metrics import evaluate_instagram, evaluate_linkedin, representative_views
+from vetting.metrics import evaluate_instagram, representative_views
 from vetting.models import Verdict, VideoStat
 
 NOW = datetime(2026, 7, 4, tzinfo=UTC)
@@ -49,10 +49,3 @@ def test_instagram_verdict_two_part_rule():
     assert evaluate_instagram(5000, 1000.0) is Verdict.FAIL  # too few views
     assert evaluate_instagram(5000, None) is Verdict.REVIEW  # followers ok, no reels
     assert evaluate_instagram(None, None) is Verdict.REVIEW  # couldn't fetch
-
-
-def test_linkedin_verdict_500_followers_100_comments():
-    assert evaluate_linkedin(600, 120.0) is Verdict.PASS
-    assert evaluate_linkedin(400, 120.0) is Verdict.FAIL  # under 500 followers
-    assert evaluate_linkedin(600, 50.0) is Verdict.FAIL  # under 100 median comments
-    assert evaluate_linkedin(600, None) is Verdict.REVIEW  # followers ok, no posts

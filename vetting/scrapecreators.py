@@ -1,4 +1,4 @@
-"""ScrapeCreators client — the paid part (Instagram + TikTok + LinkedIn).
+"""ScrapeCreators client — the paid part (Instagram + TikTok).
 
 Only runs when SCRAPECREATORS_API_KEY is set; otherwise the pipeline skips these
 steps and marks them "not-checked".
@@ -8,8 +8,6 @@ Endpoint paths and response schemas verified live against the ScrapeCreators API
   - Instagram  /v1/instagram/profile      -> followers + embedded recent media (1 call)
   - TikTok     /v1/tiktok/profile         -> followers
                /v3/tiktok/profile/videos  -> recent videos (play counts)
-  - LinkedIn   /v1/linkedin/profile       -> followers + recentPosts (links only)
-               /v1/linkedin/post          -> commentCount per post
 """
 
 from __future__ import annotations
@@ -21,7 +19,6 @@ import requests
 
 from .metrics import (
     evaluate_instagram,
-    evaluate_linkedin,
     evaluate_tiktok,
     representative_views,
 )
@@ -33,18 +30,13 @@ _BASE_URL = "https://api.scrapecreators.com"
 _IG_PROFILE = "/v1/instagram/profile"
 _TT_PROFILE = "/v1/tiktok/profile"
 _TT_VIDEOS = "/v3/tiktok/profile/videos"
-_LI_PROFILE = "/v1/linkedin/profile"
-_LI_POST = "/v1/linkedin/post"
-
-# LinkedIn comment counts need one extra request per post; cap the fan-out.
-MAX_LINKEDIN_POSTS = 12
 
 # Parse failures we convert into a REVIEW verdict rather than crashing the run.
 _PARSE_ERRORS = (KeyError, TypeError, ValueError, AttributeError)
 
 
 class ScrapeCreatorsClient:
-    """Fetches follower counts and recent-content metrics for IG, TikTok, LinkedIn."""
+    """Fetches follower counts and recent-content metrics for IG and TikTok."""
 
     def __init__(self, api_key: str, session: requests.Session | None = None,
                  timeout: float = 30.0) -> None:
@@ -105,45 +97,6 @@ class ScrapeCreatorsClient:
         avg = representative_views(videos, now=now)
         return PlatformResult(handle=handle.value, followers=followers,
                               avg_views=avg, verdict=evaluate_tiktok(followers, avg))
-
-    # --- LinkedIn: profile for followers + post links, then per-post comments ---
-
-    def check_linkedin(self, handle: Handle, *, now: datetime | None = None) -> PlatformResult:
-        guard = _guard(handle)
-        if guard is not None:
-            return guard
-        now = now or datetime.now(UTC)
-        try:
-            profile = self._get(_LI_PROFILE, {"url": handle.url})
-            followers = _to_int(profile.get("followers"))
-            comments = self._linkedin_comment_stats(profile.get("recentPosts") or [])
-        except requests.RequestException as exc:
-            return _api_error(handle, exc)
-        except _PARSE_ERRORS as exc:
-            return _parse_error(handle, exc)
-        avg = representative_views(comments, now=now)  # median comments per post
-        return PlatformResult(handle=handle.value, followers=followers,
-                              avg_views=avg, verdict=evaluate_linkedin(followers, avg))
-
-    def _linkedin_comment_stats(self, posts: list[dict]) -> list[VideoStat]:
-        """Fetch commentCount for each authored post (one request each)."""
-        stats: list[VideoStat] = []
-        for post in posts[:MAX_LINKEDIN_POSTS]:
-            if post.get("activityType") not in (None, "Post"):
-                continue  # skip reshares/comments/reactions — only authored posts
-            link = post.get("link")
-            if not link:
-                continue
-            detail = self._get(_LI_POST, {"url": link})
-            comments = _to_int(detail.get("commentCount"))
-            if comments is None:
-                continue
-            stats.append(VideoStat(
-                play_count=comments,
-                created_at=_parse_iso(post.get("datePublished")),
-                is_pinned=False,
-            ))
-        return stats
 
 
 # --- Guards and error results ---

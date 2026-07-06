@@ -18,7 +18,6 @@ COL_EMAIL = 2  # B
 COL_FIRST_NAME = 3  # C
 COL_LAST_NAME = 4  # D
 COL_YOUTUBE = 9  # I
-COL_LINKEDIN = 11  # K
 COL_INSTAGRAM = 12  # L
 COL_TIKTOK = 13  # M
 COL_COUNTRY = 15  # O
@@ -35,12 +34,8 @@ COL_OUT_TT_HANDLE = 24  # X
 COL_OUT_TT_FOLLOWERS = 25  # Y
 COL_OUT_TT_AVG_VIEWS = 26  # Z
 COL_OUT_TT_VERDICT = 27  # AA
-COL_OUT_LI_HANDLE = 28  # AB
-COL_OUT_LI_FOLLOWERS = 29  # AC
-COL_OUT_LI_AVG_COMMENTS = 30  # AD
-COL_OUT_LI_VERDICT = 31  # AE
-COL_OUT_OVERALL = 32  # AF
-COL_OUT_NOTES = 33  # AG
+COL_OUT_OVERALL = 28  # AB
+COL_OUT_NOTES = 29  # AC
 
 OUTPUT_HEADERS = {
     COL_OUT_COUNTRY_STATUS: "vet_country_status",
@@ -54,10 +49,6 @@ OUTPUT_HEADERS = {
     COL_OUT_TT_FOLLOWERS: "tt_followers",
     COL_OUT_TT_AVG_VIEWS: "tt_avg_views",
     COL_OUT_TT_VERDICT: "tt_verdict",
-    COL_OUT_LI_HANDLE: "li_handle",
-    COL_OUT_LI_FOLLOWERS: "li_followers",
-    COL_OUT_LI_AVG_COMMENTS: "li_avg_comments",
-    COL_OUT_LI_VERDICT: "li_verdict",
     COL_OUT_OVERALL: "overall_verdict",
     COL_OUT_NOTES: "notes",
 }
@@ -68,10 +59,8 @@ INSTAGRAM_MIN_FOLLOWERS = 1_000
 INSTAGRAM_MIN_AVG_VIEWS = 3_000
 TIKTOK_MIN_FOLLOWERS = 1_000
 TIKTOK_MIN_AVG_VIEWS = 3_000
-LINKEDIN_MIN_FOLLOWERS = 500
-LINKEDIN_MIN_AVG_COMMENTS = 100  # median comments per recent post
 
-# --- Average-metric methodology (views for IG/TikTok, comments for LinkedIn) ---
+# --- Average-metric methodology (median recent views for IG/TikTok) ---
 # Judge reach on recent content only, robust to viral spikes and duds:
 # median of the most recent N eligible posts, excluding pinned posts and
 # anything too fresh to have accumulated engagement.
@@ -109,8 +98,8 @@ JUNK_TOKENS = frozenset({"", "none", "na", "n/a", "nil", "-", "yes", "no", "null
 QUALIFY_ON_ANY_PLATFORM = True
 
 # Within the PAID platforms, stop once one passes (OR logic), to save credits.
-# The paid platforms are tried in priority order — Instagram, then TikTok, then
-# LinkedIn — and the rest are skipped after the first paid pass. YouTube (free) is
-# always checked independently and does NOT short-circuit the paid chain.
+# The paid platforms are tried in priority order — Instagram, then TikTok — and
+# the rest are skipped after the first paid pass. YouTube (free) is always checked
+# independently and does NOT short-circuit the paid chain.
 # Only applies when QUALIFY_ON_ANY_PLATFORM.
 SHORT_CIRCUIT_ON_PASS = True

@@ -12,7 +12,6 @@ the content/copyright/NSFW judgement calls for a human.
 | YouTube | YouTube | **free** (Data API) | Pass if **any** video ≥ 100k views |
 | Instagram | Instagram | paid | ≥ 1,000 followers **and** median recent-Reel views ≥ 3,000 |
 | TikTok | TikTok | paid | ≥ 1,000 followers **and** median recent-video views ≥ 3,000 |
-| LinkedIn | LinkedIn | paid | ≥ 500 followers **and** median recent-post comments ≥ 100 |
 
 **"Average views" methodology:** the median play count of the most recent ~12
 videos, excluding pinned videos and anything posted in the last 48h. Median (not
@@ -25,8 +24,8 @@ one platform approves the row.
 **Check order (saves paid credits, `SHORT_CIRCUIT_ON_PASS`):**
 1. **YouTube** is always checked — it's free — and runs **independently**. A
    YouTube pass does *not* skip the paid checks; they run side by side.
-2. The paid platforms are tried in priority order — **Instagram → TikTok →
-   LinkedIn** — and the moment one of *them* passes, the remaining paid platforms
+2. The paid platforms are tried in priority order — **Instagram → TikTok** —
+   and the moment one of *them* passes, the remaining paid platforms
    are **skipped** (marked `not checked (already qualified)`), so no further
    credits are spent on that row.
 
@@ -116,9 +115,7 @@ API keys, so they aren't exercised in the unit suite.
   It's gitignored; keep it out of version control and handle accordingly.
 - **ScrapeCreators endpoints are verified live (2026-07-05).** Instagram is one
   call (followers + embedded recent-media views); TikTok is two (profile +
-  `/v3/tiktok/profile/videos`); LinkedIn is a profile call plus one
-  `/v1/linkedin/post` call per recent post (for comment counts) — so LinkedIn is
-  the most credit-hungry platform. Parsers live in `vetting/scrapecreators.py`;
+  `/v3/tiktok/profile/videos`). Parsers live in `vetting/scrapecreators.py`;
   if schemas drift, that's the only file to adjust.
 - **YouTube quota.** The channel scan is bounded to the most recent
   `MAX_VIDEOS_TO_SCAN` (200) uploads to stay within the free daily quota; a viral

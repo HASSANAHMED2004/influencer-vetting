@@ -12,8 +12,6 @@ from statistics import median
 from .config import (
     INSTAGRAM_MIN_AVG_VIEWS,
     INSTAGRAM_MIN_FOLLOWERS,
-    LINKEDIN_MIN_AVG_COMMENTS,
-    LINKEDIN_MIN_FOLLOWERS,
     MIN_VIDEO_AGE_HOURS,
     RECENT_VIDEOS_COUNT,
     TIKTOK_MIN_AVG_VIEWS,
@@ -100,12 +98,4 @@ def evaluate_tiktok(followers: int | None, avg_views: float | None) -> Verdict:
     return evaluate_followers_and_views(
         followers, avg_views,
         min_followers=TIKTOK_MIN_FOLLOWERS, min_avg_views=TIKTOK_MIN_AVG_VIEWS,
-    )
-
-
-def evaluate_linkedin(followers: int | None, avg_comments: float | None) -> Verdict:
-    """LinkedIn rule: followers >= 500 AND median recent-post comments >= 100."""
-    return evaluate_followers_and_views(
-        followers, avg_comments,
-        min_followers=LINKEDIN_MIN_FOLLOWERS, min_avg_views=LINKEDIN_MIN_AVG_COMMENTS,
     )

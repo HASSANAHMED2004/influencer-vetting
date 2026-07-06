@@ -94,47 +94,6 @@ def normalize_instagram(value: object) -> Handle:
     )
 
 
-_LI_PROFILE_SEGMENTS = frozenset({"in", "company", "school", "pub"})
-# LinkedIn vanity slugs allow hyphens and are longer than social handles.
-_LI_SLUG_RE = re.compile(r"^[A-Za-z0-9\-]{3,100}$")
-
-
-def normalize_linkedin(value: object) -> Handle:
-    """Normalize a LinkedIn cell into a profile slug + canonical URL.
-
-    Handles ``linkedin.com/in/<slug>`` (people), ``/company/<slug>`` (pages),
-    country subdomains (``uk.linkedin.com``), @handles, and bare slugs. Anything
-    that isn't a resolvable LinkedIn profile is marked UNRESOLVABLE for a human.
-    """
-    text = _clean(value)
-    if text is None:
-        return Handle("linkedin", None, None, None, HandleStatus.MISSING)
-
-    if _looks_like_url(text):
-        host = _host(text)
-        if host in _AGGREGATOR_HOSTS:
-            return Handle("linkedin", text, None, text, HandleStatus.UNRESOLVABLE)
-        if not host.endswith("linkedin.com"):
-            return Handle("linkedin", text, None, text, HandleStatus.UNRESOLVABLE)
-        segments = [s for s in urlparse(text).path.strip("/").split("/") if s]
-        # e.g. ["in", "jane-doe"] or ["company", "acme"]
-        if len(segments) >= 2 and segments[0].lower() in _LI_PROFILE_SEGMENTS:
-            kind = segments[0].lower()
-            slug = segments[1]
-            if _LI_SLUG_RE.match(slug):
-                slug = slug.lower()
-                return Handle("linkedin", text, slug,
-                              f"https://www.linkedin.com/{kind}/{slug}", HandleStatus.OK)
-        return Handle("linkedin", text, None, text, HandleStatus.UNRESOLVABLE)
-
-    slug = text.lstrip("@")
-    if _LI_SLUG_RE.match(slug):
-        slug = slug.lower()
-        return Handle("linkedin", text, slug,
-                      f"https://www.linkedin.com/in/{slug}", HandleStatus.OK)
-    return Handle("linkedin", text, None, None, HandleStatus.UNRESOLVABLE)
-
-
 def normalize_tiktok(value: object) -> Handle:
     """Normalize a TikTok cell. TikTok usernames live after an '@'."""
     text = _clean(value)

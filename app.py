@@ -244,14 +244,10 @@ st.markdown(
 # --- Controls ---
 with st.container(border=True):
     uploaded = st.file_uploader("Dataset (.xlsx)", type=["xlsx"],
-                                help="Needs YouTube, Instagram, TikTok, LinkedIn and "
-                                     "country columns. Extra columns are fine.")
-    c1, c2 = st.columns(2)
-    run_paid = c1.toggle("Paid checks (Instagram / TikTok)", value=True,
+                                help="Needs YouTube, Instagram, TikTok and country "
+                                     "columns. Extra columns are fine.")
+    run_paid = st.toggle("Paid checks (Instagram / TikTok)", value=True,
                          help="YouTube is always checked for free. Off = YouTube-only.")
-    include_linkedin = c2.toggle("Include LinkedIn", value=False, disabled=not run_paid,
-                                 help="LinkedIn is the most credit-heavy platform and often "
-                                      "unavailable (404s). Off by default.")
 
 # The upload + run flow only builds a run; rendering happens afterwards from
 # session_state, so a run "View"ed from history shows even without an upload.
@@ -289,7 +285,6 @@ else:
 
     if st.button("▶  Run vetting", type="primary"):
         run_df = df.iloc[start_row - 1:end_row]
-        disabled_platforms = () if include_linkedin else ("linkedin",)
 
         # Build API clients from secrets (Streamlit Cloud) or environment (.env).
         youtube_client = None
@@ -309,7 +304,6 @@ else:
         results = run_over_dataframe(
             run_df, colmap,
             youtube_client=youtube_client, social_client=social_client,
-            disabled_platforms=disabled_platforms,
             progress=lambda f: progress.progress(f, text=f"Vetting rows… {int(f * 100)}%"),
         )
         progress.empty()
