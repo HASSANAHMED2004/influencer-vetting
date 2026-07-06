@@ -21,10 +21,10 @@ from vetting.frames import (
     PLATFORM_STYLES,
     MissingColumnsError,
     color_summary,
+    passing_frame,
     resolve_columns,
     run_over_dataframe,
-    style_dataframe,
-    write_colored_xlsx,
+    write_passing_xlsx,
 )
 from vetting.history import HistoryStore, RunMeta
 from vetting.scrapecreators import ScrapeCreatorsClient
@@ -115,8 +115,9 @@ def _legend() -> None:
         f'<div style="margin:.1rem 0 .5rem"><span class="muted" style="margin-right:8px">'
         f'Pass colors</span>{pills}</div>', unsafe_allow_html=True,
     )
-    st.markdown('<span class="muted">Multiple platforms passing → yellow. '
-                'Rows that don\'t pass are left blank.</span>', unsafe_allow_html=True)
+    st.markdown('<span class="muted">Only passing rows are shown, colored by '
+                'platform. Multiple platforms passing → yellow.</span>',
+                unsafe_allow_html=True)
 
 
 @st.cache_resource
@@ -216,14 +217,18 @@ def _render_run(run_state: dict | None) -> None:
                              _LABEL_STYLE[label].font, "") for label, n in summary.items()])
         st.markdown(f'<div style="margin:.3rem 0 .6rem">{breakdown}</div>',
                     unsafe_allow_html=True)
-    # display_df is already string-cast so Streamlit's Arrow serializer can't
-    # choke on mixed-type columns (row positions are preserved).
-    st.dataframe(style_dataframe(run_state["display_df"], results),
-                 use_container_width=True, height=560)
+    if passed == 0:
+        st.info("No rows passed the checks in this run.")
+        return
+    # Only the passing rows, colored by platform. display_df is already
+    # string-cast so Streamlit's Arrow serializer can't choke on mixed types.
+    height = min(560, 40 + 35 * (passed + 1))
+    st.dataframe(passing_frame(run_state["display_df"], results),
+                 use_container_width=True, height=height, hide_index=True)
     st.download_button(
-        "⬇  Download annotated .xlsx",
-        data=run_state["annotated_xlsx"],
-        file_name="vetted_colored.xlsx",
+        "⬇  Download passing rows (.xlsx)",
+        data=run_state["passing_xlsx"],
+        file_name="vetted_passing.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
 
@@ -314,7 +319,7 @@ else:
         run_state = {
             "results": results,
             "display_df": df.astype("string").fillna(""),
-            "annotated_xlsx": write_colored_xlsx(raw_bytes, results),
+            "passing_xlsx": write_passing_xlsx(raw_bytes, results),
             "vetted": len(run_df),
             "total_rows": total_rows,
         }

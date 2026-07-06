@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from io import BytesIO
 
 import pandas as pd
-from openpyxl import load_workbook
+from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, PatternFill
 
 from .models import ExclusionRule, RowResult, Verdict
@@ -149,44 +149,63 @@ def row_style(result: RowResult) -> RowStyle | None:
     return PLATFORM_STYLES[passed[0]]
 
 
-def style_dataframe(df: pd.DataFrame, results: list[RowResult]) -> pd.io.formats.style.Styler:
-    """Return a pandas Styler that fills each passing row with its color.
+def passing_frame(df: pd.DataFrame, results: list[RowResult]) -> pd.io.formats.style.Styler:
+    """Return a Styler of *only* the passing rows, each filled with its color.
 
-    Rows are matched by their original position (``result.row_index``), so a
-    partial run only colors the rows that were actually vetted.
+    Rows are matched to ``df`` by their original position (``result.row_index``)
+    and kept in result order. Non-passing rows are dropped entirely. A leading
+    "Row" column shows the original spreadsheet row (header is row 1, so the
+    first data row is 2).
     """
     fills = {res.row_index: s for res in results if (s := row_style(res)) is not None}
+    index = [i for i in df.index if i in fills]
+    subset = df.loc[index].copy()
+    subset.insert(0, "Row", [i + 2 for i in subset.index])  # original Excel row
 
     def _apply(row: pd.Series) -> list[str]:
-        style = fills.get(row.name)
-        if style is None:
-            return [""] * len(row)
+        style = fills[row.name]
         return [f"background-color: {style.fill}; color: {style.font};"] * len(row)
 
-    return df.style.apply(_apply, axis=1)
+    return subset.style.apply(_apply, axis=1)
 
 
-def write_colored_xlsx(uploaded_bytes: bytes, results: list[RowResult]) -> bytes:
-    """Return the uploaded workbook with passing rows whole-row color-filled.
+def write_passing_xlsx(uploaded_bytes: bytes, results: list[RowResult]) -> bytes:
+    """Build a new workbook containing only the passing rows, color-filled.
 
-    Assumes one header row; data row i (0-based) maps to sheet row i+2. Only the
-    first sheet is annotated. Non-passing rows are left untouched.
+    Copies the header and each passing row's original cell values (preserving
+    numbers/text) from the uploaded sheet into a fresh "Passing" sheet. Rows are
+    written in result order and colored by which platform qualified them.
     """
-    workbook = load_workbook(BytesIO(uploaded_bytes))
-    worksheet = workbook[workbook.sheetnames[0]]
+    source = load_workbook(BytesIO(uploaded_bytes))
+    src_ws = source[source.sheetnames[0]]
+    ncols = src_ws.max_column
+
+    out = Workbook()
+    ws = out.active
+    ws.title = "Passing"
+    ws.cell(1, 1, "Row")  # original spreadsheet row number
+    for col in range(1, ncols + 1):  # copy header after the Row column
+        ws.cell(1, col + 1, src_ws.cell(1, col).value)
+
+    out_row = 2
     for result in results:
         style = row_style(result)
         if style is None:
             continue
         fill = PatternFill("solid", fgColor=style.fill.lstrip("#"))
         font = Font(color=style.font.lstrip("#"))
-        sheet_row = result.row_index + 2  # +1 header, +1 for 1-based rows
-        for col in range(1, worksheet.max_column + 1):
-            cell = worksheet.cell(sheet_row, col)
+        src_row = result.row_index + 2  # +1 header, +1 for 1-based rows
+        row_cell = ws.cell(out_row, 1, src_row)
+        row_cell.fill = fill
+        row_cell.font = font
+        for col in range(1, ncols + 1):
+            cell = ws.cell(out_row, col + 1, src_ws.cell(src_row, col).value)
             cell.fill = fill
             cell.font = font
+        out_row += 1
+
     buffer = BytesIO()
-    workbook.save(buffer)
+    out.save(buffer)
     return buffer.getvalue()
 
 
