@@ -24,6 +24,7 @@ class SheetRow:
     youtube: object
     instagram: object
     tiktok: object
+    linkedin: object
     country: object
 
 
@@ -60,6 +61,7 @@ def read_rows(path: str | Path, start_row: int, end_row: int | None) -> list[She
             youtube=worksheet.cell(r, config.COL_YOUTUBE).value,
             instagram=worksheet.cell(r, config.COL_INSTAGRAM).value,
             tiktok=worksheet.cell(r, config.COL_TIKTOK).value,
+            linkedin=worksheet.cell(r, config.COL_LINKEDIN).value,
             country=worksheet.cell(r, config.COL_COUNTRY).value,
         ))
     workbook.close()
@@ -93,6 +95,10 @@ def write_results(input_path: str | Path, output_path: str | Path,
         worksheet.cell(r, config.COL_OUT_TT_FOLLOWERS, res.tiktok.followers)
         worksheet.cell(r, config.COL_OUT_TT_AVG_VIEWS, _num(res.tiktok.avg_views))
         worksheet.cell(r, config.COL_OUT_TT_VERDICT, res.tiktok.verdict.value)
+        worksheet.cell(r, config.COL_OUT_LI_HANDLE, res.linkedin.handle)
+        worksheet.cell(r, config.COL_OUT_LI_FOLLOWERS, res.linkedin.followers)
+        worksheet.cell(r, config.COL_OUT_LI_AVG_LIKES, _num(res.linkedin.avg_views))
+        worksheet.cell(r, config.COL_OUT_LI_VERDICT, res.linkedin.verdict.value)
         worksheet.cell(r, config.COL_OUT_OVERALL, res.overall.value)
         worksheet.cell(r, config.COL_OUT_NOTES, "; ".join(res.notes))
         # Tick the checkbox only on a clear PASS; leave the rest for manual review.

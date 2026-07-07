@@ -8,6 +8,7 @@ from vetting.models import HandleStatus
 from vetting.normalize import (
     is_filtered_country,
     normalize_instagram,
+    normalize_linkedin,
     normalize_tiktok,
     normalize_youtube,
 )
@@ -92,3 +93,42 @@ def test_youtube_refs(raw, expected_ref):
 )
 def test_geographic_screen(country, filtered):
     assert is_filtered_country(country) is filtered
+
+
+@pytest.mark.parametrize(
+    "raw,expected_slug",
+    [
+        ("https://www.linkedin.com/in/jane-doe/", "jane-doe"),
+        ("linkedin.com/in/jane-doe", "jane-doe"),  # missing https
+        ("https://uk.linkedin.com/in/jane-doe?trk=foo", "jane-doe"),
+        ("  https://www.linkedin.com/company/acme-corp  ", "acme-corp"),
+    ],
+)
+def test_linkedin_resolves_urls(raw, expected_slug):
+    result = normalize_linkedin(raw)
+    assert result.status is HandleStatus.OK
+    assert result.value == expected_slug
+    assert result.url == f"https://www.linkedin.com/in/{expected_slug}" or \
+        result.url == f"https://www.linkedin.com/company/{expected_slug}"
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        "",
+        "NA",
+        None,
+        "John Smith",  # name only
+        "jane-doe",  # bare slug without linkedin.com
+        "https://linktr.ee/jane",
+        "https://www.linkedin.com/jobs/view/123",  # not a profile
+    ],
+)
+def test_linkedin_missing_or_skipped(raw):
+    result = normalize_linkedin(raw)
+    if raw in ("", "NA", None):
+        assert result.status is HandleStatus.MISSING
+    elif raw == "https://linktr.ee/jane" or "jobs" in str(raw):
+        assert result.status is HandleStatus.UNRESOLVABLE
+    else:
+        assert result.status is HandleStatus.MISSING

@@ -1,4 +1,4 @@
-"""ScrapeCreators client — the paid part (Instagram + TikTok).
+"""ScrapeCreators client — the paid part (Instagram + TikTok + LinkedIn).
 
 Only runs when SCRAPECREATORS_API_KEY is set; otherwise the pipeline skips these
 steps and marks them "not-checked".
@@ -8,6 +8,8 @@ Endpoint paths and response schemas verified live against the ScrapeCreators API
   - Instagram  /v1/instagram/profile      -> followers + embedded recent media (1 call)
   - TikTok     /v1/tiktok/profile         -> followers
                /v3/tiktok/profile/videos  -> recent videos (play counts)
+  - LinkedIn   /v1/linkedin/profile       -> followers + recentPosts (links only)
+               /v1/linkedin/post          -> likeCount per post (only when followers pass)
 """
 
 from __future__ import annotations
@@ -17,8 +19,11 @@ from datetime import UTC, datetime
 
 import requests
 
+from .config import LINKEDIN_MIN_FOLLOWERS, LINKEDIN_RECENT_POSTS_COUNT
 from .metrics import (
+    average_recent_likes,
     evaluate_instagram,
+    evaluate_linkedin,
     evaluate_tiktok,
     representative_views,
 )
@@ -30,13 +35,15 @@ _BASE_URL = "https://api.scrapecreators.com"
 _IG_PROFILE = "/v1/instagram/profile"
 _TT_PROFILE = "/v1/tiktok/profile"
 _TT_VIDEOS = "/v3/tiktok/profile/videos"
+_LI_PROFILE = "/v1/linkedin/profile"
+_LI_POST = "/v1/linkedin/post"
 
 # Parse failures we convert into a REVIEW verdict rather than crashing the run.
 _PARSE_ERRORS = (KeyError, TypeError, ValueError, AttributeError)
 
 
 class ScrapeCreatorsClient:
-    """Fetches follower counts and recent-content metrics for IG and TikTok."""
+    """Fetches follower counts and recent-content metrics for IG, TikTok, LinkedIn."""
 
     def __init__(self, api_key: str, session: requests.Session | None = None,
                  timeout: float = 30.0) -> None:
@@ -98,6 +105,55 @@ class ScrapeCreatorsClient:
         return PlatformResult(handle=handle.value, followers=followers,
                               avg_views=avg, verdict=evaluate_tiktok(followers, avg))
 
+    # --- LinkedIn: profile for followers; post calls only when followers pass ---
+
+    def check_linkedin(self, handle: Handle, *, now: datetime | None = None) -> PlatformResult:
+        guard = _guard(handle)
+        if guard is not None:
+            return guard
+        try:
+            profile = self._get(_LI_PROFILE, {"url": handle.url})
+            followers = _to_int(profile.get("followers"))
+            if followers is None:
+                return PlatformResult(
+                    handle=handle.value, verdict=Verdict.REVIEW, note="follower count unavailable",
+                )
+            if followers < LINKEDIN_MIN_FOLLOWERS:
+                return PlatformResult(
+                    handle=handle.value, followers=followers, verdict=Verdict.FAIL,
+                    note=f"below {LINKEDIN_MIN_FOLLOWERS} followers",
+                )
+            likes = self._linkedin_like_stats(profile.get("recentPosts") or [])
+        except requests.RequestException as exc:
+            return _api_error(handle, exc)
+        except _PARSE_ERRORS as exc:
+            return _parse_error(handle, exc)
+        avg = average_recent_likes(likes)
+        return PlatformResult(handle=handle.value, followers=followers,
+                              avg_views=avg, verdict=evaluate_linkedin(followers, avg))
+
+    def _linkedin_like_stats(self, posts: list[dict]) -> list[VideoStat]:
+        """Fetch likeCount for up to N authored posts (one request each)."""
+        stats: list[VideoStat] = []
+        for post in posts:
+            if len(stats) >= LINKEDIN_RECENT_POSTS_COUNT:
+                break
+            if not _is_authored_linkedin_post(post):
+                continue
+            link = post.get("link")
+            if not link:
+                continue
+            detail = self._get(_LI_POST, {"url": link})
+            likes = _to_int(detail.get("likeCount"))
+            if likes is None:
+                continue
+            stats.append(VideoStat(
+                play_count=likes,
+                created_at=_parse_iso(post.get("datePublished")),
+                is_pinned=False,
+            ))
+        return stats
+
 
 # --- Guards and error results ---
 
@@ -105,10 +161,16 @@ class ScrapeCreatorsClient:
 def _guard(handle: Handle) -> PlatformResult | None:
     if handle.status is HandleStatus.MISSING:
         return PlatformResult(verdict=Verdict.SKIPPED, note=f"no {handle.platform}")
-    if handle.status is HandleStatus.UNRESOLVABLE or not handle.value:
+    if handle.status is HandleStatus.UNRESOLVABLE or not handle.url:
         return PlatformResult(verdict=Verdict.REVIEW,
                               note=f"unresolvable {handle.platform} link")
     return None
+
+
+def _is_authored_linkedin_post(post: dict) -> bool:
+    """Skip reshares/reactions — only count posts authored by the profile owner."""
+    activity = (post.get("activityType") or "").casefold()
+    return not activity.startswith("shared by")
 
 
 def _not_found(handle: Handle, payload: dict) -> PlatformResult:

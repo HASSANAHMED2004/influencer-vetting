@@ -244,9 +244,9 @@ st.markdown(
 # --- Controls ---
 with st.container(border=True):
     uploaded = st.file_uploader("Dataset (.xlsx)", type=["xlsx"],
-                                help="Needs YouTube, Instagram, TikTok and country "
+                                help="Needs YouTube, Instagram, TikTok, LinkedIn and country "
                                      "columns. Extra columns are fine.")
-    run_paid = st.toggle("Paid checks (Instagram / TikTok)", value=True,
+    run_paid = st.toggle("Paid checks (Instagram / TikTok / LinkedIn)", value=True,
                          help="YouTube is always checked for free. Off = YouTube-only.")
 
 # The upload + run flow only builds a run; rendering happens afterwards from

@@ -12,6 +12,9 @@ from statistics import median
 from .config import (
     INSTAGRAM_MIN_AVG_VIEWS,
     INSTAGRAM_MIN_FOLLOWERS,
+    LINKEDIN_MIN_AVG_LIKES,
+    LINKEDIN_MIN_FOLLOWERS,
+    LINKEDIN_RECENT_POSTS_COUNT,
     MIN_VIDEO_AGE_HOURS,
     RECENT_VIDEOS_COUNT,
     TIKTOK_MIN_AVG_VIEWS,
@@ -99,3 +102,27 @@ def evaluate_tiktok(followers: int | None, avg_views: float | None) -> Verdict:
         followers, avg_views,
         min_followers=TIKTOK_MIN_FOLLOWERS, min_avg_views=TIKTOK_MIN_AVG_VIEWS,
     )
+
+
+def average_recent_likes(
+    posts: list[VideoStat],
+    *,
+    count: int = LINKEDIN_RECENT_POSTS_COUNT,
+) -> float | None:
+    """Arithmetic mean like count of the N most recent posts."""
+    if not posts:
+        return None
+    posts.sort(key=lambda v: v.created_at or datetime.min.replace(tzinfo=UTC), reverse=True)
+    recent = posts[:count]
+    return sum(v.play_count for v in recent) / len(recent)
+
+
+def evaluate_linkedin(followers: int | None, avg_likes: float | None) -> Verdict:
+    """LinkedIn rule: followers >= 800 AND mean likes on recent posts >= 10."""
+    if followers is None:
+        return Verdict.REVIEW
+    if followers < LINKEDIN_MIN_FOLLOWERS:
+        return Verdict.FAIL
+    if avg_likes is None:
+        return Verdict.REVIEW
+    return Verdict.PASS if avg_likes >= LINKEDIN_MIN_AVG_LIKES else Verdict.FAIL

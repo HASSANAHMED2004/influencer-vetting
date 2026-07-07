@@ -111,5 +111,6 @@ class RowResult:
     youtube: PlatformResult = field(default_factory=PlatformResult)
     instagram: PlatformResult = field(default_factory=PlatformResult)
     tiktok: PlatformResult = field(default_factory=PlatformResult)
+    linkedin: PlatformResult = field(default_factory=PlatformResult)
     overall: Verdict = Verdict.REVIEW
     notes: list[str] = field(default_factory=list)

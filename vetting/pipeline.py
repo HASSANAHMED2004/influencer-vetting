@@ -1,4 +1,4 @@
-"""Per-row orchestration: geo screen -> normalize -> YouTube -> IG/TikTok -> verdict.
+"""Per-row orchestration: geo screen -> normalize -> platform checks -> verdict.
 
 The decision logic (`decide_overall`) is pure and testable; `process_row` wires
 the clients to it. Either client may be None (e.g. no API key / free-only run),
@@ -18,6 +18,7 @@ from .models import ExclusionRule, Handle, HandleStatus, PlatformResult, RowResu
 from .normalize import (
     normalize_country,
     normalize_instagram,
+    normalize_linkedin,
     normalize_tiktok,
     normalize_youtube,
 )
@@ -30,6 +31,7 @@ class InfluencerRow(Protocol):
     youtube: object
     instagram: object
     tiktok: object
+    linkedin: object
     country: object
 
 
@@ -40,6 +42,7 @@ class _YouTubeLike(Protocol):
 class _SocialLike(Protocol):
     def check_instagram(self, handle: Handle, *, now: datetime) -> PlatformResult: ...
     def check_tiktok(self, handle: Handle, *, now: datetime) -> PlatformResult: ...
+    def check_linkedin(self, handle: Handle, *, now: datetime) -> PlatformResult: ...
 
 
 def decide_overall(results: list[PlatformResult], *, any_platform: bool) -> Verdict:
@@ -102,7 +105,8 @@ def process_row(
     yt_handle = normalize_youtube(row.youtube)
     ig_handle = normalize_instagram(row.instagram)
     tt_handle = normalize_tiktok(row.tiktok)
-    for h in (yt_handle, ig_handle, tt_handle):
+    li_handle = normalize_linkedin(row.linkedin)
+    for h in (yt_handle, ig_handle, tt_handle, li_handle):
         if h.status is HandleStatus.UNRESOLVABLE:
             result.notes.append(f"{h.platform} link needs manual check: {h.raw}")
 
@@ -113,7 +117,7 @@ def process_row(
     else:
         result.youtube = _skipped_or_review(yt_handle, "youtube step disabled")
 
-    # 4. Paid platforms in priority order — Instagram, then TikTok —
+    # 4. Paid platforms in priority order: Instagram, TikTok, then LinkedIn,
     #    short-circuiting once one of *them* passes, to save API credits. This chain
     #    runs regardless of the YouTube result.
     short_circuit = SHORT_CIRCUIT_ON_PASS and QUALIFY_ON_ANY_PLATFORM
@@ -121,6 +125,7 @@ def process_row(
     paid_steps = (
         ("instagram", ig_handle, "check_instagram", "instagram not-checked (no api key)"),
         ("tiktok", tt_handle, "check_tiktok", "tiktok not-checked (no api key)"),
+        ("linkedin", li_handle, "check_linkedin", "linkedin not-checked (no api key)"),
     )
     for attr, handle, method, disabled_note in paid_steps:
         if attr in disabled_platforms:
@@ -139,7 +144,7 @@ def process_row(
 
     # 5. Combine.
     result.overall = decide_overall(
-        [result.youtube, result.instagram, result.tiktok],
+        [result.youtube, result.instagram, result.tiktok, result.linkedin],
         any_platform=QUALIFY_ON_ANY_PLATFORM,
     )
     return result
@@ -154,8 +159,6 @@ def _skipped_or_review(handle: Handle, disabled_note: str) -> PlatformResult:
 
 def _already_qualified(handle: Handle) -> PlatformResult:
     """A paid platform we deliberately skipped because the row already passed."""
-    if handle.status is HandleStatus.MISSING:
-        return PlatformResult(verdict=Verdict.SKIPPED, note=f"no {handle.platform}")
     return PlatformResult(handle=handle.value, verdict=Verdict.SKIPPED,
                           note="not checked (already qualified)")
 

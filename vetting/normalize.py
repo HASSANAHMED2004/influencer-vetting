@@ -83,6 +83,57 @@ def _looks_like_url(text: str) -> bool:
     return "://" in text or text.lower().startswith("www.") or "/" in text
 
 
+_LI_PROFILE_SEGMENTS = frozenset({"in", "company", "school", "pub"})
+_LI_SLUG_RE = re.compile(r"^[A-Za-z0-9\-]{3,100}$")
+
+
+def _coerce_linkedin_url(text: str) -> str | None:
+    """Return a fetchable LinkedIn URL, or None if the cell has no linkedin.com link."""
+    if "linkedin.com" not in text.casefold():
+        return None
+    url = text.strip()
+    if not url.lower().startswith(("http://", "https://")):
+        url = "https://" + url.lstrip("/")
+    return url
+
+
+def normalize_linkedin(value: object) -> Handle:
+    """Normalize a LinkedIn cell — URL-only; plain names and bare slugs are skipped.
+
+    Accepts full or partial profile URLs (``linkedin.com/in/slug``, country
+    subdomains, missing ``https://``). Anything without ``linkedin.com`` is
+    treated as missing (e.g. a person's name with no link).
+    """
+    text = _clean(value)
+    if text is None:
+        return Handle("linkedin", None, None, None, HandleStatus.MISSING)
+
+    if _looks_like_url(text) and "linkedin.com" not in text.casefold():
+        host = _host(text)
+        if host in _AGGREGATOR_HOSTS or "linkedin.com" not in host:
+            return Handle("linkedin", text, None, text, HandleStatus.UNRESOLVABLE)
+
+    url = _coerce_linkedin_url(text)
+    if url is None:
+        return Handle("linkedin", text, None, None, HandleStatus.MISSING)
+
+    host = _host(url)
+    if host in _AGGREGATOR_HOSTS:
+        return Handle("linkedin", text, None, url, HandleStatus.UNRESOLVABLE)
+    if not host.endswith("linkedin.com"):
+        return Handle("linkedin", text, None, url, HandleStatus.UNRESOLVABLE)
+
+    segments = [s for s in urlparse(url).path.strip("/").split("/") if s]
+    if len(segments) >= 2 and segments[0].lower() in _LI_PROFILE_SEGMENTS:
+        kind = segments[0].lower()
+        slug = segments[1]
+        if _LI_SLUG_RE.match(slug):
+            slug = slug.lower()
+            canonical = f"https://www.linkedin.com/{kind}/{slug}"
+            return Handle("linkedin", text, slug, canonical, HandleStatus.OK)
+    return Handle("linkedin", text, None, url, HandleStatus.UNRESOLVABLE)
+
+
 def normalize_instagram(value: object) -> Handle:
     """Normalize an Instagram cell (URL, @handle, bare username, or junk)."""
     return _normalize_social(

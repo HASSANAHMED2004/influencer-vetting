@@ -20,13 +20,13 @@ from vetting.models import PlatformResult, RowResult, Verdict
 
 def test_resolve_columns_by_header_ignoring_extras_and_order():
     df = pd.DataFrame(columns=[
-        "Email", "TikTok", "YouTube", "Your country/region",
+        "Email", "TikTok", "YouTube", "LinkedIn", "Your country/region",
         "Instagram", "Random Extra",
     ])
     colmap = resolve_columns(df)
     assert colmap == {
         "youtube": "YouTube", "instagram": "Instagram", "tiktok": "TikTok",
-        "country": "Your country/region",
+        "linkedin": "LinkedIn", "country": "Your country/region",
     }
 
 
@@ -48,6 +48,7 @@ def test_row_style_single_platform_colors():
     assert row_style(_result(instagram=Verdict.PASS)) is PLATFORM_STYLES["instagram"]
     assert row_style(_result(youtube=Verdict.PASS)) is PLATFORM_STYLES["youtube"]
     assert row_style(_result(tiktok=Verdict.PASS)) is PLATFORM_STYLES["tiktok"]
+    assert row_style(_result(linkedin=Verdict.PASS)) is PLATFORM_STYLES["linkedin"]
 
 
 def test_row_style_multi_is_yellow():
@@ -65,6 +66,7 @@ def test_run_over_dataframe_free_mode_and_exclusion():
         "YouTube": ["chan", None],
         "Instagram": ["someone", "other"],
         "TikTok": [None, None],
+        "LinkedIn": [None, None],
         "Your country/region": ["Spain", "India"],  # 2nd row excluded
     })
     colmap = resolve_columns(df)
@@ -80,6 +82,7 @@ def test_partial_run_preserves_original_positions():
         "YouTube": [None, None, None],
         "Instagram": ["a", "b", "c"],
         "TikTok": [None, None, None],
+        "LinkedIn": [None, None, None],
         "Your country/region": ["Spain", "Spain", "Spain"],
     })
     colmap = resolve_columns(df)
@@ -119,6 +122,7 @@ def test_write_passing_xlsx_only_passing_rows_with_values_and_color():
         "YouTube": ["a", "b", "c"],
         "Instagram": ["x", "y", "z"],
         "TikTok": [None, None, None],
+        "LinkedIn": [None, None, None],
         "Your country/region": ["Spain", "Spain", "Spain"],
     })
     buf = BytesIO()
