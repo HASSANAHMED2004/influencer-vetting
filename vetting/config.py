@@ -68,9 +68,7 @@ INSTAGRAM_MIN_FOLLOWERS = 1_000
 INSTAGRAM_MIN_AVG_VIEWS = 3_000
 TIKTOK_MIN_FOLLOWERS = 1_000
 TIKTOK_MIN_AVG_VIEWS = 3_000
-LINKEDIN_MIN_FOLLOWERS = 800
-LINKEDIN_MIN_AVG_LIKES = 10
-LINKEDIN_RECENT_POSTS_COUNT = 5
+LINKEDIN_MIN_FOLLOWERS = 800  # followers-only rule (via Bright Data)
 
 # --- Average-metric methodology (median recent views for IG/TikTok) ---
 # Judge reach on recent content only, robust to viral spikes and duds:

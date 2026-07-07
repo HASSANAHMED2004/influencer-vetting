@@ -64,7 +64,10 @@ def is_filtered_country(value: object) -> bool:
 
 
 def _host(url: str) -> str:
-    host = urlparse(url).netloc.lower()
+    try:
+        host = urlparse(url).netloc.lower()
+    except ValueError:  # malformed URL (e.g. bad IPv6 literal) -> treat as no host
+        return ""
     return host[4:] if host.startswith("www.") else host
 
 

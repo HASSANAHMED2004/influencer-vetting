@@ -12,6 +12,12 @@ the content/copyright/NSFW judgement calls for a human.
 | YouTube | YouTube | **free** (Data API) | Pass if **any** video ≥ 100k views |
 | Instagram | Instagram | paid | ≥ 1,000 followers **and** median recent-Reel views ≥ 3,000 |
 | TikTok | TikTok | paid | ≥ 1,000 followers **and** median recent-video views ≥ 3,000 |
+| LinkedIn | LinkedIn | paid (Bright Data) | ≥ 800 followers (followers-only) |
+
+LinkedIn goes through **Bright Data**, not ScrapeCreators — ScrapeCreators is
+~89% blind on LinkedIn (private/unavailable profiles come back 404), whereas
+Bright Data recovers most of them. Public LinkedIn post-engagement is too
+inconsistent to gate on, so LinkedIn is judged on follower count alone.
 
 **"Average views" methodology:** the median play count of the most recent ~12
 videos, excluding pinned videos and anything posted in the last 48h. Median (not
@@ -24,10 +30,11 @@ one platform approves the row.
 **Check order (saves paid credits, `SHORT_CIRCUIT_ON_PASS`):**
 1. **YouTube** is always checked — it's free — and runs **independently**. A
    YouTube pass does *not* skip the paid checks; they run side by side.
-2. The paid platforms are tried in priority order — **Instagram → TikTok** —
-   and the moment one of *them* passes, the remaining paid platforms
+2. The paid platforms are tried in priority order — **Instagram → TikTok →
+   LinkedIn** — and the moment one of *them* passes, the remaining paid platforms
    are **skipped** (marked `not checked (already qualified)`), so no further
-   credits are spent on that row.
+   credits are spent on that row. (LinkedIn is only reached when both IG and
+   TikTok fail, so its slower Bright Data calls happen rarely.)
 
 Content vetting (religious/political/offensive, real-actor copyright, NSFW) is
 **not** automated — it stays a manual pass on the rows that clear the numbers.
@@ -43,6 +50,9 @@ cp .env.example .env           # then fill in your API keys
 - **`YOUTUBE_API_KEY`** — free, from Google Cloud Console (enable "YouTube Data API v3").
 - **`SCRAPECREATORS_API_KEY`** — optional/paid, from https://scrapecreators.com.
   Without it, Instagram/TikTok are skipped and marked *not-checked*.
+- **`BRIGHTDATA_API_TOKEN`** — optional, from brightdata.com (5k free records/mo).
+  Powers the LinkedIn check; without it, LinkedIn is skipped. Optionally set
+  **`BRIGHTDATA_DATASET_ID`** (defaults to the LinkedIn people-profiles scraper).
 
 ## Run
 

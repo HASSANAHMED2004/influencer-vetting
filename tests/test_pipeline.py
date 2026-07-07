@@ -62,11 +62,11 @@ class FakeYouTube:
 
 
 class FakeSocial:
-    """Records which paid platforms were actually called."""
+    """Records which paid IG/TikTok checks were actually called (ScrapeCreators)."""
 
-    def __init__(self, ig=Verdict.FAIL, tt=Verdict.FAIL, li=Verdict.FAIL):
+    def __init__(self, ig=Verdict.FAIL, tt=Verdict.FAIL):
         self.calls: list[str] = []
-        self._verdicts = {"instagram": ig, "tiktok": tt, "linkedin": li}
+        self._verdicts = {"instagram": ig, "tiktok": tt}
 
     def _call(self, platform, handle):
         self.calls.append(platform)
@@ -78,50 +78,64 @@ class FakeSocial:
     def check_tiktok(self, handle, *, now):
         return self._call("tiktok", handle)
 
+
+class FakeLinkedIn:
+    """LinkedIn client (Bright Data) — separate from IG/TikTok."""
+
+    def __init__(self, li=Verdict.FAIL):
+        self.calls: list[str] = []
+        self._verdict = li
+
     def check_linkedin(self, handle, *, now):
-        return self._call("linkedin", handle)
+        self.calls.append("linkedin")
+        return PlatformResult(handle=handle.value, verdict=self._verdict)
 
 
 def _full_row():
     return FakeRow(2, youtube="chan", instagram="ig_user", tiktok="tt_user",
-                   country="Spain")
+                   linkedin="https://www.linkedin.com/in/john-doe", country="Spain")
 
 
 def test_instagram_pass_short_circuits_tiktok_and_linkedin():
-    social = FakeSocial(ig=Verdict.PASS)
+    social, linkedin = FakeSocial(ig=Verdict.PASS), FakeLinkedIn()
     result = process_row(_full_row(), youtube_client=FakeYouTube(Verdict.FAIL),
-                         social_client=social)
+                         social_client=social, linkedin_client=linkedin)
     assert result.overall is Verdict.PASS
-    assert social.calls == ["instagram"]  # tiktok/linkedin never called
+    assert social.calls == ["instagram"]  # tiktok never called
+    assert linkedin.calls == []  # linkedin never called (Bright Data credits saved)
     assert result.tiktok.note == "not checked (already qualified)"
     assert result.linkedin.note == "not checked (already qualified)"
 
 
 def test_youtube_pass_does_not_skip_paid_chain():
     # YouTube runs side by side: even though it passes, the paid chain still runs.
-    social = FakeSocial(ig=Verdict.FAIL, tt=Verdict.FAIL)
+    social, linkedin = FakeSocial(ig=Verdict.FAIL, tt=Verdict.FAIL), FakeLinkedIn()
     result = process_row(_full_row(), youtube_client=FakeYouTube(Verdict.PASS),
-                         social_client=social)
+                         social_client=social, linkedin_client=linkedin)
     assert result.overall is Verdict.PASS  # YouTube alone qualifies it
-    assert social.calls == ["instagram", "tiktok", "linkedin"]  # all still checked
+    assert social.calls == ["instagram", "tiktok"]  # both still checked
+    assert linkedin.calls == ["linkedin"]  # linkedin still checked too
 
 
 def test_disabled_platform_is_never_called():
     social = FakeSocial(ig=Verdict.FAIL, tt=Verdict.PASS)
     result = process_row(_full_row(), youtube_client=FakeYouTube(Verdict.FAIL),
-                         social_client=social, disabled_platforms=("tiktok",))
+                         social_client=social, linkedin_client=FakeLinkedIn(li=Verdict.FAIL),
+                         disabled_platforms=("tiktok",))
     assert "tiktok" not in social.calls  # never called
     assert result.tiktok.verdict is Verdict.SKIPPED
     assert result.tiktok.note == "tiktok disabled"
     assert result.overall is Verdict.FAIL  # TikTok would've passed, but it's off
 
 
-def test_falls_through_to_tiktok_when_instagram_fails():
-    social = FakeSocial(ig=Verdict.FAIL, tt=Verdict.PASS)
+def test_falls_through_to_linkedin_when_ig_and_tiktok_fail():
+    social = FakeSocial(ig=Verdict.FAIL, tt=Verdict.FAIL)
+    linkedin = FakeLinkedIn(li=Verdict.PASS)
     result = process_row(_full_row(), youtube_client=FakeYouTube(Verdict.FAIL),
-                         social_client=social)
-    assert result.overall is Verdict.PASS
-    assert social.calls == ["instagram", "tiktok"]  # linkedin skipped after tiktok pass
+                         social_client=social, linkedin_client=linkedin)
+    assert result.overall is Verdict.PASS  # LinkedIn (Bright Data) qualifies it
+    assert social.calls == ["instagram", "tiktok"]
+    assert linkedin.calls == ["linkedin"]
 
 
 def test_decide_overall_any_platform():

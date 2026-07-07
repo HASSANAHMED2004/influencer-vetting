@@ -42,6 +42,9 @@ class _YouTubeLike(Protocol):
 class _SocialLike(Protocol):
     def check_instagram(self, handle: Handle, *, now: datetime) -> PlatformResult: ...
     def check_tiktok(self, handle: Handle, *, now: datetime) -> PlatformResult: ...
+
+
+class _LinkedInLike(Protocol):
     def check_linkedin(self, handle: Handle, *, now: datetime) -> PlatformResult: ...
 
 
@@ -73,6 +76,7 @@ def process_row(
     *,
     youtube_client: _YouTubeLike | None = None,
     social_client: _SocialLike | None = None,
+    linkedin_client: _LinkedInLike | None = None,
     exclusion_rules: Sequence[ExclusionRule] | None = None,
     disabled_platforms: Collection[str] = (),
     now: datetime | None = None,
@@ -119,23 +123,27 @@ def process_row(
 
     # 4. Paid platforms in priority order: Instagram, TikTok, then LinkedIn,
     #    short-circuiting once one of *them* passes, to save API credits. This chain
-    #    runs regardless of the YouTube result.
+    #    runs regardless of the YouTube result. IG/TikTok use ScrapeCreators;
+    #    LinkedIn uses Bright Data (ScrapeCreators is ~89% blind on LinkedIn).
     short_circuit = SHORT_CIRCUIT_ON_PASS and QUALIFY_ON_ANY_PLATFORM
     paid_approved = False
     paid_steps = (
-        ("instagram", ig_handle, "check_instagram", "instagram not-checked (no api key)"),
-        ("tiktok", tt_handle, "check_tiktok", "tiktok not-checked (no api key)"),
-        ("linkedin", li_handle, "check_linkedin", "linkedin not-checked (no api key)"),
+        ("instagram", ig_handle, social_client, "check_instagram",
+         "instagram not-checked (no api key)"),
+        ("tiktok", tt_handle, social_client, "check_tiktok",
+         "tiktok not-checked (no api key)"),
+        ("linkedin", li_handle, linkedin_client, "check_linkedin",
+         "linkedin not-checked (no api key)"),
     )
-    for attr, handle, method, disabled_note in paid_steps:
+    for attr, handle, client, method, disabled_note in paid_steps:
         if attr in disabled_platforms:
             setattr(result, attr, _disabled(handle))
             continue
         if short_circuit and paid_approved:
             setattr(result, attr, _already_qualified(handle))
             continue
-        if social_client is not None:
-            outcome = getattr(social_client, method)(handle, now=now)
+        if client is not None:
+            outcome = getattr(client, method)(handle, now=now)
         else:
             outcome = _skipped_or_review(handle, disabled_note)
         setattr(result, attr, outcome)

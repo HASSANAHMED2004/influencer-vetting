@@ -5,7 +5,6 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 
 from vetting.metrics import (
-    average_recent_likes,
     evaluate_instagram,
     evaluate_linkedin,
     representative_views,
@@ -56,14 +55,11 @@ def test_instagram_verdict_two_part_rule():
     assert evaluate_instagram(None, None) is Verdict.REVIEW  # couldn't fetch
 
 
-def test_average_recent_likes_mean():
-    posts = [_video(l) for l in (10, 20, 30, 40, 50)]
-    assert average_recent_likes(posts) == 30.0
-
-
-def test_linkedin_verdict_follower_gate_and_likes():
-    assert evaluate_linkedin(1000, 15.0) is Verdict.PASS
-    assert evaluate_linkedin(799, 100.0) is Verdict.FAIL  # followers fail first
-    assert evaluate_linkedin(1000, 5.0) is Verdict.FAIL  # likes too low
-    assert evaluate_linkedin(1000, None) is Verdict.REVIEW  # no post data
-    assert evaluate_linkedin(None, 15.0) is Verdict.REVIEW
+def test_linkedin_verdict_followers_only():
+    # Followers-only rule: >= 800 PASS, missing REVIEW, else FAIL. avg_likes ignored.
+    assert evaluate_linkedin(1000) is Verdict.PASS
+    assert evaluate_linkedin(800) is Verdict.PASS
+    assert evaluate_linkedin(799) is Verdict.FAIL
+    assert evaluate_linkedin(None) is Verdict.REVIEW
+    assert evaluate_linkedin(1000, 0.0) is Verdict.PASS  # low likes don't block
+    assert evaluate_linkedin(500, 999.0) is Verdict.FAIL  # high likes don't rescue

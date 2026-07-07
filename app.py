@@ -16,6 +16,7 @@ import pandas as pd
 import streamlit as st
 from dotenv import load_dotenv
 
+from vetting.brightdata import BrightDataLinkedInClient
 from vetting.frames import (
     MULTI_STYLE,
     PLATFORM_STYLES,
@@ -294,16 +295,23 @@ else:
             st.warning("No YOUTUBE_API_KEY set — YouTube will not be checked.")
 
         social_client = None
+        linkedin_client = None
         if run_paid:
             if sc_key := _secret("SCRAPECREATORS_API_KEY"):
                 social_client = ScrapeCreatorsClient(sc_key)
             else:
-                st.warning("No SCRAPECREATORS_API_KEY set — paid checks skipped.")
+                st.warning("No SCRAPECREATORS_API_KEY set — Instagram/TikTok skipped.")
+            if bd_token := _secret("BRIGHTDATA_API_TOKEN"):
+                linkedin_client = BrightDataLinkedInClient(
+                    bd_token, _secret("BRIGHTDATA_DATASET_ID"))
+            else:
+                st.warning("No BRIGHTDATA_API_TOKEN set — LinkedIn skipped.")
 
         progress = st.progress(0.0, text="Vetting rows…")
         results = run_over_dataframe(
             run_df, colmap,
             youtube_client=youtube_client, social_client=social_client,
+            linkedin_client=linkedin_client,
             progress=lambda f: progress.progress(f, text=f"Vetting rows… {int(f * 100)}%"),
         )
         progress.empty()

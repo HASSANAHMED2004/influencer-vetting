@@ -101,6 +101,7 @@ def run_over_dataframe(
     *,
     youtube_client=None,
     social_client=None,
+    linkedin_client=None,
     exclusion_rules: Sequence[ExclusionRule] | None = None,
     disabled_platforms: Collection[str] = (),
     progress: Callable[[float], None] | None = None,
@@ -119,8 +120,8 @@ def run_over_dataframe(
         )
         results.append(process_row(
             adapter, youtube_client=youtube_client,
-            social_client=social_client, exclusion_rules=exclusion_rules,
-            disabled_platforms=disabled_platforms,
+            social_client=social_client, linkedin_client=linkedin_client,
+            exclusion_rules=exclusion_rules, disabled_platforms=disabled_platforms,
         ))
         if progress is not None:
             progress(done / total)

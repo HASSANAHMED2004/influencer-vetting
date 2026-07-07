@@ -12,9 +12,7 @@ from statistics import median
 from .config import (
     INSTAGRAM_MIN_AVG_VIEWS,
     INSTAGRAM_MIN_FOLLOWERS,
-    LINKEDIN_MIN_AVG_LIKES,
     LINKEDIN_MIN_FOLLOWERS,
-    LINKEDIN_RECENT_POSTS_COUNT,
     MIN_VIDEO_AGE_HOURS,
     RECENT_VIDEOS_COUNT,
     TIKTOK_MIN_AVG_VIEWS,
@@ -104,25 +102,14 @@ def evaluate_tiktok(followers: int | None, avg_views: float | None) -> Verdict:
     )
 
 
-def average_recent_likes(
-    posts: list[VideoStat],
-    *,
-    count: int = LINKEDIN_RECENT_POSTS_COUNT,
-) -> float | None:
-    """Arithmetic mean like count of the N most recent posts."""
-    if not posts:
-        return None
-    posts.sort(key=lambda v: v.created_at or datetime.min.replace(tzinfo=UTC), reverse=True)
-    recent = posts[:count]
-    return sum(v.play_count for v in recent) / len(recent)
+def evaluate_linkedin(followers: int | None, avg_likes: float | None = None) -> Verdict:
+    """LinkedIn rule: followers-only.
 
-
-def evaluate_linkedin(followers: int | None, avg_likes: float | None) -> Verdict:
-    """LinkedIn rule: followers >= 800 AND mean likes on recent posts >= 10."""
+    Public LinkedIn post-engagement is too inconsistent across providers to gate
+    on, so we judge on the one stable signal — follower count. ``avg_likes`` is
+    kept in the signature for informational use but does not affect the verdict.
+    followers >= 800 -> PASS; unavailable followers -> REVIEW; else FAIL.
+    """
     if followers is None:
         return Verdict.REVIEW
-    if followers < LINKEDIN_MIN_FOLLOWERS:
-        return Verdict.FAIL
-    if avg_likes is None:
-        return Verdict.REVIEW
-    return Verdict.PASS if avg_likes >= LINKEDIN_MIN_AVG_LIKES else Verdict.FAIL
+    return Verdict.PASS if followers >= LINKEDIN_MIN_FOLLOWERS else Verdict.FAIL

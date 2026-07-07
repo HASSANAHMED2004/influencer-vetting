@@ -20,6 +20,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from vetting import config
+from vetting.brightdata import BrightDataLinkedInClient
 from vetting.models import ExclusionRule, MatchMode
 from vetting.pipeline import process_row
 from vetting.scrapecreators import ScrapeCreatorsClient
@@ -72,7 +73,9 @@ def build_exclusion_rules(args: argparse.Namespace) -> list[ExclusionRule]:
     return rules
 
 
-def build_clients(paid: bool) -> tuple[YouTubeClient | None, ScrapeCreatorsClient | None]:
+def build_clients(
+    paid: bool,
+) -> tuple[YouTubeClient | None, ScrapeCreatorsClient | None, BrightDataLinkedInClient | None]:
     youtube = None
     yt_key = os.getenv("YOUTUBE_API_KEY")
     if yt_key:
@@ -80,14 +83,19 @@ def build_clients(paid: bool) -> tuple[YouTubeClient | None, ScrapeCreatorsClien
     else:
         logger.warning("YOUTUBE_API_KEY not set — YouTube checks will be skipped.")
 
-    social = None
+    social = linkedin = None
     if paid:
         sc_key = os.getenv("SCRAPECREATORS_API_KEY")
         if sc_key:
             social = ScrapeCreatorsClient(sc_key)
         else:
             logger.warning("--paid set but SCRAPECREATORS_API_KEY missing — IG/TikTok skipped.")
-    return youtube, social
+        bd_token = os.getenv("BRIGHTDATA_API_TOKEN")
+        if bd_token:
+            linkedin = BrightDataLinkedInClient(bd_token, os.getenv("BRIGHTDATA_DATASET_ID"))
+        else:
+            logger.warning("--paid set but BRIGHTDATA_API_TOKEN missing — LinkedIn skipped.")
+    return youtube, social, linkedin
 
 
 def default_output(input_path: str, start: int, end: int | None) -> str:
@@ -104,7 +112,7 @@ def main() -> None:
         format="%(levelname)s %(name)s: %(message)s",
     )
 
-    youtube, social = build_clients(args.paid)
+    youtube, social, linkedin = build_clients(args.paid)
     rules = build_exclusion_rules(args)
     logger.info("Country exclusion rules active: %s",
                 [f"{r.describe()} {sorted(r.values)} ({r.mode.value})" for r in rules])
@@ -117,7 +125,7 @@ def main() -> None:
     tally: Counter[str] = Counter()
     for row in rows:
         result = process_row(row, youtube_client=youtube, social_client=social,
-                             exclusion_rules=rules)
+                             linkedin_client=linkedin, exclusion_rules=rules)
         results.append(result)
         tally[result.overall.value] += 1
 
