@@ -114,3 +114,6 @@ class RowResult:
     linkedin: PlatformResult = field(default_factory=PlatformResult)
     overall: Verdict = Verdict.REVIEW
     notes: list[str] = field(default_factory=list)
+    # Canonical profile URL per platform (from normalization), for building
+    # clickable links in the results view. Only resolvable handles are present.
+    urls: dict[str, str] = field(default_factory=dict)

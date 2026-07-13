@@ -15,8 +15,19 @@ import pandas as pd
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, PatternFill
 
+from .config import EXCLUDED_OUTPUT_COLUMNS
 from .models import ExclusionRule, RowResult, Verdict
 from .pipeline import process_row
+
+
+def is_excluded_column(header: object) -> bool:
+    """True if a column should be hidden from the display and the export.
+
+    Matches the configured names (case-insensitive, trimmed) plus any pandas
+    "Unnamed: N" artifact column.
+    """
+    name = str(header).strip().lower()
+    return name in EXCLUDED_OUTPUT_COLUMNS or name.startswith("unnamed:")
 
 # Required logical columns -> keywords matched against the uploaded headers
 # (case-insensitive: exact match preferred, else substring).
@@ -150,6 +161,26 @@ def row_style(result: RowResult) -> RowStyle | None:
     return PLATFORM_STYLES[passed[0]]
 
 
+# Order the approved platforms are listed/linked in (paid socials first).
+_APPROVED_ORDER = ("instagram", "tiktok", "youtube", "linkedin")
+
+
+def approved_label_and_url(result: RowResult) -> tuple[str, str]:
+    """Human label of the passing platform(s) and a URL to open the primary one.
+
+    e.g. ("Instagram, YouTube", "https://www.instagram.com/…"). Empty strings if
+    nothing passed or no resolvable profile URL is available.
+    """
+    passed = set(passed_platforms(result))
+    if not passed:
+        return "", ""
+    ordered = [p for p in _APPROVED_ORDER if p in passed]
+    label = ", ".join(PLATFORM_STYLES[p].label for p in ordered)
+    urls = getattr(result, "urls", {}) or {}
+    url = next((urls[p] for p in ordered if urls.get(p)), "")
+    return label, url
+
+
 def passing_frame(df: pd.DataFrame, results: list[RowResult]) -> pd.io.formats.style.Styler:
     """Return a Styler of *only* the passing rows, each filled with its color.
 
@@ -159,13 +190,20 @@ def passing_frame(df: pd.DataFrame, results: list[RowResult]) -> pd.io.formats.s
     first data row is 2).
     """
     fills = {res.row_index: s for res in results if (s := row_style(res)) is not None}
+    links = {res.row_index: approved_label_and_url(res) for res in results}
     index = [i for i in df.index if i in fills]
-    subset = df.loc[index].copy()
+    keep = [c for c in df.columns if not is_excluded_column(c)]
+    subset = df.loc[index, keep].copy()
     subset.insert(0, "Row", [i + 2 for i in subset.index])  # original Excel row
+    # Leading "Approved" column holds the profile URL; the UI renders it as a
+    # clickable link labelled by platform (see app.py column_config).
+    subset.insert(0, "Approved", [links.get(i, ("", ""))[1] for i in subset.index])
 
     def _apply(row: pd.Series) -> list[str]:
         style = fills[row.name]
-        return [f"background-color: {style.fill}; color: {style.font};"] * len(row)
+        css = f"background-color: {style.fill}; color: {style.font};"
+        # Leave "Approved" uncolored so the hyperlink stays readable.
+        return ["" if col == "Approved" else css for col in row.index]
 
     return subset.style.apply(_apply, axis=1)
 
@@ -180,13 +218,18 @@ def write_passing_xlsx(uploaded_bytes: bytes, results: list[RowResult]) -> bytes
     source = load_workbook(BytesIO(uploaded_bytes))
     src_ws = source[source.sheetnames[0]]
     ncols = src_ws.max_column
+    # Keep only source columns that aren't excluded (by their header cell).
+    keep_cols = [c for c in range(1, ncols + 1)
+                 if not is_excluded_column(src_ws.cell(1, c).value)]
 
+    link_font = Font(color="0563C1", underline="single")
     out = Workbook()
     ws = out.active
     ws.title = "Passing"
-    ws.cell(1, 1, "Row")  # original spreadsheet row number
-    for col in range(1, ncols + 1):  # copy header after the Row column
-        ws.cell(1, col + 1, src_ws.cell(1, col).value)
+    ws.cell(1, 1, "Approved")  # passing platform(s), hyperlinked to the profile
+    ws.cell(1, 2, "Row")  # original spreadsheet row number
+    for out_col, src_col in enumerate(keep_cols, start=3):  # headers after Approved+Row
+        ws.cell(1, out_col, src_ws.cell(1, src_col).value)
 
     out_row = 2
     for result in results:
@@ -196,11 +239,17 @@ def write_passing_xlsx(uploaded_bytes: bytes, results: list[RowResult]) -> bytes
         fill = PatternFill("solid", fgColor=style.fill.lstrip("#"))
         font = Font(color=style.font.lstrip("#"))
         src_row = result.row_index + 2  # +1 header, +1 for 1-based rows
-        row_cell = ws.cell(out_row, 1, src_row)
+
+        label, url = approved_label_and_url(result)
+        approved_cell = ws.cell(out_row, 1, label)  # left uncolored for readability
+        if url:
+            approved_cell.hyperlink = url
+            approved_cell.font = link_font
+        row_cell = ws.cell(out_row, 2, src_row)
         row_cell.fill = fill
         row_cell.font = font
-        for col in range(1, ncols + 1):
-            cell = ws.cell(out_row, col + 1, src_ws.cell(src_row, col).value)
+        for out_col, src_col in enumerate(keep_cols, start=3):
+            cell = ws.cell(out_row, out_col, src_ws.cell(src_row, src_col).value)
             cell.fill = fill
             cell.font = font
         out_row += 1

@@ -224,8 +224,16 @@ def _render_run(run_state: dict | None) -> None:
     # Only the passing rows, colored by platform. display_df is already
     # string-cast so Streamlit's Arrow serializer can't choke on mixed types.
     height = min(560, 40 + 35 * (passed + 1))
-    st.dataframe(passing_frame(run_state["display_df"], results),
-                 use_container_width=True, height=height, hide_index=True)
+    st.dataframe(
+        passing_frame(run_state["display_df"], results),
+        use_container_width=True, height=height, hide_index=True,
+        column_config={
+            # "Approved" holds a profile URL; render it as a clickable link
+            # labelled by platform (the token before ".com").
+            "Approved": st.column_config.LinkColumn(
+                "Approved", display_text=r"(?:www\.)?([^./]+)\.com"),
+        },
+    )
     st.download_button(
         "⬇  Download passing rows (.xlsx)",
         data=run_state["passing_xlsx"],

@@ -9,6 +9,7 @@ from vetting.frames import (
     MULTI_STYLE,
     PLATFORM_STYLES,
     MissingColumnsError,
+    is_excluded_column,
     passing_frame,
     resolve_columns,
     row_style,
@@ -77,6 +78,44 @@ def test_run_over_dataframe_free_mode_and_exclusion():
     assert all(row_style(r) is None for r in results)
 
 
+def test_is_excluded_column():
+    assert is_excluded_column("Discord")
+    assert is_excluded_column("  discord ")  # trimmed + case-insensitive
+    assert is_excluded_column("X")
+    assert is_excluded_column("Unnamed: 0")
+    assert is_excluded_column("Unnamed: 7")
+    assert not is_excluded_column("Instagram")
+    assert not is_excluded_column("Email")
+
+
+def test_excluded_columns_dropped_from_display_and_export():
+    from io import BytesIO
+
+    from openpyxl import load_workbook
+
+    df = pd.DataFrame({
+        "Unnamed: 0": [0, 1],
+        "Email": ["a@x.com", "b@x.com"],
+        "Discord": ["a#1", "b#2"],
+        "Instagram": ["ig_a", "ig_b"],
+        "X": ["xa", "xb"],
+    })
+    results = [_result(0, instagram=Verdict.PASS), _result(1, instagram=Verdict.FAIL)]
+
+    shown = passing_frame(df.astype("string").fillna(""), results).data
+    assert "Discord" not in shown.columns and "X" not in shown.columns
+    assert "Unnamed: 0" not in shown.columns
+    assert "Email" in shown.columns and "Instagram" in shown.columns
+
+    buf = BytesIO()
+    df.to_excel(buf, index=False)
+    ws = load_workbook(BytesIO(write_passing_xlsx(buf.getvalue(), results))).active
+    headers = [ws.cell(1, c).value for c in range(1, ws.max_column + 1)]
+    assert headers[:2] == ["Approved", "Row"]
+    assert "Discord" not in headers and "X" not in headers and "Unnamed: 0" not in headers
+    assert "Email" in headers and "Instagram" in headers
+
+
 def test_partial_run_preserves_original_positions():
     df = pd.DataFrame({
         "YouTube": [None, None, None],
@@ -104,7 +143,8 @@ def test_passing_frame_keeps_only_passing_rows_in_order():
     assert list(styler.data["Name"]) == ["Alice", "Cara", "Dan"]
     # Leading "Row" column = original spreadsheet row (0-based pos + 2).
     assert list(styler.data["Row"]) == [2, 4, 5]
-    assert list(styler.data.columns)[0] == "Row"
+    # Leading columns: "Approved" (link) then "Row".
+    assert list(styler.data.columns)[:2] == ["Approved", "Row"]
 
 
 def test_passing_frame_empty_when_nothing_passes():
@@ -136,8 +176,9 @@ def test_write_passing_xlsx_only_passing_rows_with_values_and_color():
     ws = load_workbook(BytesIO(write_passing_xlsx(buf.getvalue(), results))).active
     # Header + exactly the 2 passing rows, in order.
     assert ws.max_row == 3
-    # Col 1 is the original spreadsheet row number; col 2 is the first real column.
-    assert [ws.cell(r, 1).value for r in (1, 2, 3)] == ["Row", 2, 4]
-    assert [ws.cell(r, 2).value for r in (1, 2, 3)] == ["YouTube", "a", "c"]
-    assert ws.cell(2, 1).fill.fgColor.rgb.endswith("800080")  # IG purple (Row cell too)
-    assert ws.cell(3, 2).fill.fgColor.rgb.endswith("FF0000")  # YouTube red
+    # Col 1 = Approved (platform label), col 2 = original Excel row, col 3 = first data col.
+    assert [ws.cell(r, 1).value for r in (1, 2, 3)] == ["Approved", "Instagram", "YouTube"]
+    assert [ws.cell(r, 2).value for r in (1, 2, 3)] == ["Row", 2, 4]
+    assert [ws.cell(r, 3).value for r in (1, 2, 3)] == ["YouTube", "a", "c"]
+    assert ws.cell(2, 2).fill.fgColor.rgb.endswith("800080")  # IG purple (Row cell)
+    assert ws.cell(3, 3).fill.fgColor.rgb.endswith("FF0000")  # YouTube red

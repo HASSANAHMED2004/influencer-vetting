@@ -110,7 +110,10 @@ def process_row(
     ig_handle = normalize_instagram(row.instagram)
     tt_handle = normalize_tiktok(row.tiktok)
     li_handle = normalize_linkedin(row.linkedin)
-    for h in (yt_handle, ig_handle, tt_handle, li_handle):
+    handles = {"youtube": yt_handle, "instagram": ig_handle,
+               "tiktok": tt_handle, "linkedin": li_handle}
+    result.urls = {p: h.url for p, h in handles.items() if h.url}
+    for h in handles.values():
         if h.status is HandleStatus.UNRESOLVABLE:
             result.notes.append(f"{h.platform} link needs manual check: {h.raw}")
 

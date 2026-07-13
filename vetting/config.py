@@ -102,6 +102,27 @@ EXCLUSION_RULES: list[ExclusionRule] = [
 # Tokens that appear in handle/country cells but carry no real value.
 JUNK_TOKENS = frozenset({"", "none", "na", "n/a", "nil", "-", "yes", "no", "null"})
 
+# Columns hidden from the results table and the downloaded .xlsx (matched
+# case-insensitively on the trimmed header; any "Unnamed: N" pandas artifact is
+# also dropped). This does NOT affect vetting — the pipeline still reads every
+# column it needs; these are just removed from what's shown/exported.
+EXCLUDED_OUTPUT_COLUMNS = frozenset({
+    "openart account (email address you use to log in - please double check it's correct)",
+    "discord",
+    "which best describes you",
+    "are you already an openart affiliate",
+    "x",
+    "other",
+    "how did you discover openart, and why do you want to become a creative partner?",
+    "quiz_score",
+    "score",
+    "total_scorable_questions",
+    "winning_outcome_id",
+    "ending_displayed_id",
+    "submitted at",
+    "token",
+})
+
 # An influencer is a candidate for manual content review if their numbers clear
 # the bar on AT LEAST ONE platform they are present on. Set to False to instead
 # require passing on every platform where they have an account.
