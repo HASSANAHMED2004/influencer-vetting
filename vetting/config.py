@@ -111,7 +111,6 @@ EXCLUDED_OUTPUT_COLUMNS = frozenset({
     "discord",
     "which best describes you",
     "are you already an openart affiliate",
-    "x",
     "other",
     "how did you discover openart, and why do you want to become a creative partner?",
     "quiz_score",
