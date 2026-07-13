@@ -81,9 +81,10 @@ def test_run_over_dataframe_free_mode_and_exclusion():
 def test_is_excluded_column():
     assert is_excluded_column("Discord")
     assert is_excluded_column("  discord ")  # trimmed + case-insensitive
-    assert is_excluded_column("X")
+    assert is_excluded_column("Token")
     assert is_excluded_column("Unnamed: 0")
     assert is_excluded_column("Unnamed: 7")
+    assert not is_excluded_column("X")  # X is kept
     assert not is_excluded_column("Instagram")
     assert not is_excluded_column("Email")
 
@@ -98,22 +99,22 @@ def test_excluded_columns_dropped_from_display_and_export():
         "Email": ["a@x.com", "b@x.com"],
         "Discord": ["a#1", "b#2"],
         "Instagram": ["ig_a", "ig_b"],
-        "X": ["xa", "xb"],
+        "X": ["xa", "xb"],  # kept
     })
     results = [_result(0, instagram=Verdict.PASS), _result(1, instagram=Verdict.FAIL)]
 
     shown = passing_frame(df.astype("string").fillna(""), results).data
-    assert "Discord" not in shown.columns and "X" not in shown.columns
+    assert "Discord" not in shown.columns
     assert "Unnamed: 0" not in shown.columns
-    assert "Email" in shown.columns and "Instagram" in shown.columns
+    assert "Email" in shown.columns and "Instagram" in shown.columns and "X" in shown.columns
 
     buf = BytesIO()
     df.to_excel(buf, index=False)
     ws = load_workbook(BytesIO(write_passing_xlsx(buf.getvalue(), results))).active
     headers = [ws.cell(1, c).value for c in range(1, ws.max_column + 1)]
     assert headers[:2] == ["Approved", "Row"]
-    assert "Discord" not in headers and "X" not in headers and "Unnamed: 0" not in headers
-    assert "Email" in headers and "Instagram" in headers
+    assert "Discord" not in headers and "Unnamed: 0" not in headers
+    assert "Email" in headers and "Instagram" in headers and "X" in headers
 
 
 def test_partial_run_preserves_original_positions():
