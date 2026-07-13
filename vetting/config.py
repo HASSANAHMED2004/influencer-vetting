@@ -121,6 +121,12 @@ EXCLUDED_OUTPUT_COLUMNS = frozenset({
     "ending_displayed_id",
     "submitted at",
     "token",
+    "(optional) portfolio",
+    "how'd you hear about the program?",
+    "user_id",
+    "thanks for applying!",
+    "correct_answers",
+    "max_score",
 })
 
 # An influencer is a candidate for manual content review if their numbers clear
