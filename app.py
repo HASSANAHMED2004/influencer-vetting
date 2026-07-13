@@ -280,20 +280,25 @@ else:
         unsafe_allow_html=True,
     )
 
+    first_excel_row = 2
+    last_excel_row = total_rows + 1
     if total_rows > 1:
         start_row, end_row = st.slider(
-            "Rows to vet", 1, total_rows, (1, total_rows),
-            help="Only these rows are checked (saves API credits). Others stay blank.",
+            "Excel rows to vet", first_excel_row, last_excel_row,
+            (first_excel_row, last_excel_row),
+            help="Only these spreadsheet rows are checked (saves API credits). Others stay blank.",
         )
     else:
-        start_row, end_row = 1, total_rows
+        start_row, end_row = first_excel_row, last_excel_row
     st.markdown(f'<span class="muted">Will vet rows {start_row}–{end_row} '
                 f'({end_row - start_row + 1:,} rows).</span>', unsafe_allow_html=True)
 
     _legend()
 
     if st.button("▶  Run vetting", type="primary"):
-        run_df = df.iloc[start_row - 1:end_row]
+        start_idx = start_row - first_excel_row
+        end_idx = end_row - first_excel_row + 1
+        run_df = df.iloc[start_idx:end_idx]
 
         # Build API clients from secrets (Streamlit Cloud) or environment (.env).
         youtube_client = None
