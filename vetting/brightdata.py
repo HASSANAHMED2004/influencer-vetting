@@ -23,6 +23,7 @@ import requests
 
 from .metrics import evaluate_linkedin
 from .models import Handle, HandleStatus, PlatformResult, Verdict
+from .quota import http_status
 
 logger = logging.getLogger(__name__)
 
@@ -110,7 +111,8 @@ def _guard(handle: Handle) -> PlatformResult | None:
 def _api_error(handle: Handle, exc: Exception) -> PlatformResult:
     logger.warning("bright data linkedin lookup failed for %s: %s", handle.value, exc)
     return PlatformResult(handle=handle.value, verdict=Verdict.REVIEW,
-                          note=f"bright data error: {exc}")
+                          note=f"bright data error: {exc}",
+                          error_status=http_status(exc))
 
 
 def _parse_error(handle: Handle, exc: Exception) -> PlatformResult:

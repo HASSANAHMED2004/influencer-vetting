@@ -99,6 +99,15 @@ EXCLUSION_RULES: list[ExclusionRule] = [
     ),
 ]
 
+# --- Out-of-credits safeguard ---
+# HTTP statuses that mean "the problem is your plan/key", not "this profile is
+# private": 401 unauthorized, 402 payment required, 403 quota exceeded (YouTube
+# uses this), 429 rate limited. When one platform returns these
+# QUOTA_ABORT_AFTER times *consecutively*, the run stops instead of silently
+# marking every remaining row REVIEW. Consecutive, so a one-off blip is ignored.
+QUOTA_ERROR_STATUSES = frozenset({401, 402, 403, 429})
+QUOTA_ABORT_AFTER = 3
+
 # Tokens that appear in handle/country cells but carry no real value.
 JUNK_TOKENS = frozenset({"", "none", "na", "n/a", "nil", "-", "yes", "no", "null"})
 

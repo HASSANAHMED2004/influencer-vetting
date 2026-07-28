@@ -28,6 +28,7 @@ from vetting.frames import (
     write_passing_xlsx,
 )
 from vetting.history import HistoryStore, RunMeta
+from vetting.quota import QuotaExhausted
 from vetting.scrapecreators import ScrapeCreatorsClient
 from vetting.youtube import YouTubeClient
 
@@ -134,7 +135,8 @@ def _history_store() -> HistoryStore | None:
         return None
 
 
-def _save_to_history(run_state: dict, start_row: int, end_row: int) -> None:
+def _save_to_history(run_state: dict, start_row: int, end_row: int,
+                     partial: bool = False) -> None:
     """Persist a finished run to Supabase (best-effort)."""
     store = _history_store()
     if store is None:
@@ -142,7 +144,7 @@ def _save_to_history(run_state: dict, start_row: int, end_row: int) -> None:
     summary = color_summary(run_state["results"])
     run_id = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
     meta = {
-        "row_range": f"{start_row}–{end_row}",
+        "row_range": f"{start_row}–{end_row}" + (" (partial)" if partial else ""),
         "vetted": run_state["vetted"],
         "passed": sum(summary.values()),
         "breakdown": " · ".join(f"{k}: {v}" for k, v in summary.items()),
@@ -204,6 +206,15 @@ def _render_run(run_state: dict | None) -> None:
     results = run_state["results"]
     summary = color_summary(results)
     passed = sum(summary.values())
+    # An out-of-credits abort: say so loudly, but still show what did pass.
+    # .get() because runs saved before this feature have no "aborted" key.
+    if run_state.get("aborted"):
+        st.error(
+            f"⚠️ **Run stopped early — API credits exhausted.**\n\n{run_state['aborted']}\n\n"
+            "The rows checked before this are shown below and can still be "
+            "downloaded. Top up the key, then re-run from the row after the last "
+            "one vetted."
+        )
     st.markdown(
         '<div class="statgrid">'
         f'<div class="stat a"><div class="n">{passed:,}</div><div class="l">Passed</div></div>'
@@ -221,6 +232,7 @@ def _render_run(run_state: dict | None) -> None:
     if passed == 0:
         st.info("No rows passed the checks in this run.")
         return
+
     # Only the passing rows, colored by platform. display_df is already
     # string-cast so Streamlit's Arrow serializer can't choke on mixed types.
     height = min(560, 40 + 35 * (passed + 1))
@@ -321,12 +333,18 @@ else:
                 st.warning("No BRIGHTDATA_API_TOKEN set — LinkedIn skipped.")
 
         progress = st.progress(0.0, text="Vetting rows…")
-        results = run_over_dataframe(
-            run_df, colmap,
-            youtube_client=youtube_client, social_client=social_client,
-            linkedin_client=linkedin_client,
-            progress=lambda f: progress.progress(f, text=f"Vetting rows… {int(f * 100)}%"),
-        )
+        # If an API plan runs dry mid-run we still keep everything checked so
+        # far — the rows that already passed are shown and downloadable.
+        aborted: QuotaExhausted | None = None
+        try:
+            results = run_over_dataframe(
+                run_df, colmap,
+                youtube_client=youtube_client, social_client=social_client,
+                linkedin_client=linkedin_client,
+                progress=lambda f: progress.progress(f, text=f"Vetting rows… {int(f * 100)}%"),
+            )
+        except QuotaExhausted as exc:
+            aborted, results = exc, exc.results
         progress.empty()
 
         # Store everything the results view needs so it survives Streamlit's
@@ -335,11 +353,13 @@ else:
             "results": results,
             "display_df": df.astype("string").fillna(""),
             "passing_xlsx": write_passing_xlsx(raw_bytes, results),
-            "vetted": len(run_df),
+            "vetted": len(results),
             "total_rows": total_rows,
+            "aborted": str(aborted) if aborted else "",
         }
         st.session_state["run"] = run_state
-        _save_to_history(run_state, start_row, end_row)
+        last_excel = start_row + len(results) - 1 if aborted else end_row
+        _save_to_history(run_state, start_row, last_excel, partial=bool(aborted))
 
 # Sidebar history is rendered after the run block so a fresh run appears in it.
 _render_history_sidebar()

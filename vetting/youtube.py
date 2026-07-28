@@ -17,6 +17,7 @@ import requests
 
 from .config import YOUTUBE_MIN_VIDEO_VIEWS
 from .models import Handle, HandleStatus, PlatformResult, Verdict
+from .quota import http_status
 
 logger = logging.getLogger(__name__)
 
@@ -114,7 +115,8 @@ class YouTubeClient:
         except requests.RequestException as exc:  # network/quota errors are recoverable
             logger.warning("YouTube lookup failed for %s: %s", handle.value, exc)
             return PlatformResult(handle=handle.value, verdict=Verdict.REVIEW,
-                                  note=f"youtube api error: {exc}")
+                                  note=f"youtube api error: {exc}",
+                                  error_status=http_status(exc))
 
         verdict = Verdict.PASS if max_views >= YOUTUBE_MIN_VIDEO_VIEWS else Verdict.FAIL
         return PlatformResult(handle=handle.value, avg_views=float(max_views), verdict=verdict)

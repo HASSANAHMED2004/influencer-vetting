@@ -99,6 +99,9 @@ class PlatformResult:
     avg_views: float | None = None
     verdict: Verdict = Verdict.SKIPPED
     note: str = ""
+    # HTTP status when the lookup failed at the API level, else None. Lets the
+    # run detect an exhausted plan (401/402/403/429) versus a bad profile.
+    error_status: int | None = None
 
 
 @dataclass

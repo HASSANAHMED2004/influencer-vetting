@@ -23,6 +23,7 @@ from vetting import config
 from vetting.brightdata import BrightDataLinkedInClient
 from vetting.models import ExclusionRule, MatchMode
 from vetting.pipeline import process_row
+from vetting.quota import QuotaExhausted, QuotaGuard
 from vetting.scrapecreators import ScrapeCreatorsClient
 from vetting.sheet_io import read_rows, write_results
 from vetting.youtube import YouTubeClient
@@ -123,17 +124,32 @@ def main() -> None:
 
     results = []
     tally: Counter[str] = Counter()
+    guard = QuotaGuard()
+    aborted: QuotaExhausted | None = None
     for row in rows:
         result = process_row(row, youtube_client=youtube, social_client=social,
                              linkedin_client=linkedin, exclusion_rules=rules)
         results.append(result)
         tally[result.overall.value] += 1
+        try:
+            # Stop early if an API plan is exhausted, rather than marking every
+            # remaining row REVIEW. Everything vetted so far is still written.
+            guard.observe(result, results)
+        except QuotaExhausted as exc:
+            aborted = exc
+            break
 
     output = args.output or default_output(args.input, args.start_row, args.end_row)
     write_results(args.input, output, results)
 
+    if aborted is not None:
+        logger.error("RUN STOPPED EARLY: %s", aborted)
+        logger.error("Partial results for %d of %d rows were still written.",
+                     len(results), len(rows))
     logger.info("Done. Overall verdicts: %s", dict(tally))
     logger.info("Wrote annotated workbook -> %s", output)
+    if aborted is not None:
+        raise SystemExit(2)  # non-zero so scripts/CI notice the run was cut short
 
 
 if __name__ == "__main__":

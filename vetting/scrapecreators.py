@@ -24,6 +24,7 @@ from .metrics import (
     representative_views,
 )
 from .models import Handle, HandleStatus, PlatformResult, Verdict, VideoStat
+from .quota import http_status
 
 logger = logging.getLogger(__name__)
 
@@ -122,7 +123,7 @@ def _not_found(handle: Handle, payload: dict) -> PlatformResult:
 def _api_error(handle: Handle, exc: Exception) -> PlatformResult:
     logger.warning("%s lookup failed for %s: %s", handle.platform, handle.value, exc)
     return PlatformResult(handle=handle.value, verdict=Verdict.REVIEW,
-                          note=f"api error: {exc}")
+                          note=f"api error: {exc}", error_status=http_status(exc))
 
 
 def _parse_error(handle: Handle, exc: Exception) -> PlatformResult:

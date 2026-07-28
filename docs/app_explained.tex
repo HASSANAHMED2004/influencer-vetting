@@ -1,0 +1,782 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{xcolor}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage{tcolorbox}
+\usepackage{amssymb}
+\usepackage{fontspec}
+\usepackage{sectsty}
+\usepackage{parskip}
+\usepackage{fancyhdr}
+\usepackage{hyperref}
+
+% ---- Colors ----
+\definecolor{brandpurple}{HTML}{7C3AED}
+\definecolor{brandpink}{HTML}{EC4899}
+\definecolor{brandblue}{HTML}{3B82F6}
+\definecolor{inkdark}{HTML}{1F2430}
+\definecolor{inkgray}{HTML}{5B6472}
+\definecolor{boxbg}{HTML}{F5F1FE}
+\definecolor{boxborder}{HTML}{E3D9F7}
+\definecolor{codebg}{HTML}{F3F4F6}
+
+% ---- Fonts (fall back gracefully) ----
+\setmainfont{Helvetica Neue}
+
+% ---- Section styling ----
+\allsectionsfont{\color{inkdark}}
+\titleformat{\section}{\LARGE\bfseries\color{brandpurple}}{\thesection.}{0.5em}{}
+\titleformat{\subsection}{\large\bfseries\color{inkdark}}{}{0em}{}
+\titlespacing*{\section}{0pt}{18pt}{8pt}
+
+% ---- Links ----
+\hypersetup{colorlinks=true, linkcolor=brandpurple, urlcolor=brandblue}
+
+% ---- Header / footer ----
+\pagestyle{fancy}
+\fancyhf{}
+\renewcommand{\headrulewidth}{0pt}
+\fancyfoot[C]{\small\color{inkgray}Influencer Vetting App — How It Works}
+\fancyfoot[R]{\small\color{inkgray}\thepage}
+
+% ---- Helper boxes ----
+\newtcolorbox{plainbox}{
+  colback=boxbg, colframe=boxborder, boxrule=1pt, arc=6pt,
+  left=10pt, right=10pt, top=8pt, bottom=8pt}
+
+\newtcolorbox{analogybox}{
+  colback=white, colframe=brandpink, boxrule=1.2pt, arc=6pt,
+  left=10pt, right=10pt, top=8pt, bottom=8pt}
+
+\newcommand{\term}[1]{\textbf{\color{brandpurple}#1}}
+\newcommand{\file}[1]{\texttt{\color{inkdark}#1}}
+
+% Inline "code-ish" word
+\newcommand{\word}[1]{\colorbox{codebg}{\texttt{\small #1}}}
+
+\setlist[itemize]{leftmargin=1.4em, itemsep=3pt, topsep=3pt}
+
+\begin{document}
+
+% ============ TITLE ============
+\begin{titlepage}
+\centering
+\vspace*{3cm}
+{\Huge\bfseries\color{brandpurple} Influencer Vetting App\par}
+\vspace{0.6cm}
+{\LARGE\color{inkdark} How the Whole Thing Works\par}
+\vspace{0.4cm}
+{\large\color{inkgray} A plain-English guide — no coding knowledge needed\par}
+\vspace{2cm}
+\begin{plainbox}
+\large
+This document explains, in simple words, what the app does from start to
+finish, and then walks through every important file one by one — what it is,
+why it exists, and how it fits into the bigger picture.
+\end{plainbox}
+\vfill
+{\color{inkgray}\large Prepared as an interview-ready explainer\par}
+\vspace{1cm}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+% ============ PART 1: THE BIG PICTURE ============
+\section{The Big Picture (say this in an interview)}
+
+\subsection{What problem does it solve?}
+
+A company (OpenArt) runs a program where social-media creators
+\emph{apply} to become paid partners. Hundreds or thousands of people fill in
+a form with links to their Instagram, TikTok, YouTube, and LinkedIn accounts.
+Someone has to check each applicant and decide: \emph{is this person a real,
+big-enough influencer worth working with?}
+
+Doing that by hand is slow and boring. This app does it automatically.
+
+\begin{analogybox}
+\textbf{Simple analogy:} Think of it as an automatic bouncer at a club door.
+Everyone hands over their ID (their social links). The bouncer checks each one
+against the rules — big enough following? enough views? from an allowed
+country? — and only lets in the people who qualify, marking them in colour.
+\end{analogybox}
+
+\subsection{The flow, from start to finish}
+
+Here is the whole journey in plain words. This is the part you can say out loud
+in an interview:
+
+\begin{enumerate}[leftmargin=1.6em, itemsep=5pt]
+  \item \textbf{Upload.} The user opens a web page and uploads a spreadsheet
+  (an Excel \file{.xlsx} file) full of applicants. Each row is one person, with
+  columns for their YouTube, Instagram, TikTok, LinkedIn, and country.
+
+  \item \textbf{Pick a range.} The user can choose to check only some of the
+  rows (for example rows 2 to 300) instead of all of them. This matters because
+  some of the checks cost money per person, so you don't always want to run
+  every row.
+
+  \item \textbf{Run the checks.} The user clicks ``Run.'' For \emph{each} row,
+  the app does this in order:
+  \begin{itemize}
+    \item \textbf{Country screen first} — if the person lives in an excluded
+    country, stop immediately and don't waste any money checking them.
+    \item \textbf{Clean up the links} — turn messy inputs (like
+    ``@MyHandle'' or ``instagram.com/me/'') into a tidy, standard form the
+    app can actually look up.
+    \item \textbf{Check YouTube} — free, so it always runs. Does any of their
+    videos have enough views?
+    \item \textbf{Check the paid platforms} — Instagram, then TikTok, then
+    LinkedIn. These cost money, so as soon as \emph{one} of them passes, the
+    app stops checking the rest of the paid ones for that person (to save
+    money).
+  \end{itemize}
+
+  \item \textbf{Decide a verdict.} Each platform gets a result: \term{PASS},
+  \term{FAIL}, \term{REVIEW} (can't tell automatically — a human should look),
+  or \term{SKIPPED} (they're not on that platform). The person's overall
+  verdict is \term{PASS} if they clear the bar on \emph{at least one} platform.
+
+  \item \textbf{Show the winners.} The app displays only the people who passed,
+  each row colour-coded by which platform qualified them (purple for Instagram,
+  red for YouTube, black for TikTok, blue for LinkedIn, yellow if more than
+  one). A first column shows which platform they were approved on, as a
+  clickable link straight to their profile.
+
+  \item \textbf{Download and remember.} The user can download those passing
+  rows as a fresh Excel file. The run is also saved to an online history, so if
+  they close the page and come back later, their past runs are still there.
+\end{enumerate}
+
+\begin{plainbox}
+\textbf{One-sentence version:}
+``It's a web app where you upload a spreadsheet of influencer applicants, it
+automatically checks each one's social-media accounts against follower and view
+thresholds, filters out excluded countries, and hands you back just the people
+who qualify — colour-coded and downloadable.''
+\end{plainbox}
+
+\subsection{Two ways to run it}
+
+The exact same checking logic can be used in two ways:
+
+\begin{itemize}
+  \item \textbf{The web app} (\file{app.py}) — the friendly point-and-click
+  version most people use.
+  \item \textbf{The command line} (\file{run.py}) — a ``power user'' version you
+  run by typing a command, useful for large automated batches.
+\end{itemize}
+
+Both share the same ``brain'' (the \file{vetting/} folder). The user interface
+is just a shell around it.
+
+\subsection{The key idea: separation of ``brain'' and ``face''}
+
+The most important design idea, and a great thing to mention in an interview:
+
+\begin{analogybox}
+The \textbf{decision-making logic} (the rules: how many followers is enough,
+how to clean a link, how to combine results) is kept completely separate from
+the \textbf{parts that talk to the outside world} (the website, the Excel
+files, the paid APIs). \\[4pt]
+\textbf{Why this is smart:} the rules can be tested on their own with fake data,
+without spending money on real API calls or needing a real spreadsheet. It also
+means you can swap the website for a command line without rewriting a single
+rule.
+\end{analogybox}
+
+\newpage
+
+% ============ PART 2: FILE BY FILE ============
+\section{Every File, One by One}
+
+The project is split into small files, each with one job. Below, each file is
+explained the same way: \emph{what it is}, in one line, then \emph{what it does}
+in plain words.
+
+Think of the files in three groups:
+\begin{itemize}
+  \item \textbf{The two front doors} — \file{app.py} and \file{run.py}.
+  \item \textbf{The brain} — everything in the \file{vetting/} folder.
+  \item \textbf{The helpers} that talk to the outside world — the API clients
+  and file readers.
+\end{itemize}
+
+% ---------------------------------
+\subsection{app.py — the website}
+\begin{plainbox}
+\textbf{One line:} the web page users see — upload, run, view results, download.
+\end{plainbox}
+
+This file builds the whole interactive website using a tool called
+\term{Streamlit} (a library that turns Python into a web app without needing
+separate web-design code).
+
+What it handles:
+\begin{itemize}
+  \item Shows the title, the styling (the purple/pink gradients), and an
+  optional password gate so not just anyone can open it.
+  \item Provides the \textbf{upload box} for the Excel file and a \textbf{toggle}
+  to turn the paid checks on or off.
+  \item Shows a \textbf{slider} to pick which spreadsheet rows to check.
+  \item When ``Run'' is clicked, it builds the connections to the outside
+  services (YouTube, ScrapeCreators, Bright Data) using secret keys, then hands
+  the rows to the brain to do the actual checking, showing a progress bar.
+  \item Displays the \textbf{results table} (only passing rows, colour-coded)
+  and the \textbf{download button}.
+  \item Manages the \textbf{history sidebar} — listing past runs, and letting you
+  re-open or delete them.
+\end{itemize}
+
+\begin{analogybox}
+\textbf{Why one detail matters:} Streamlit re-runs the whole page every time you
+click anything. So the app carefully \emph{remembers} the last run's results in
+a ``session memory,'' otherwise your results would vanish the moment you clicked
+the download button.
+\end{analogybox}
+
+% ---------------------------------
+\subsection{run.py — the command-line version}
+\begin{plainbox}
+\textbf{One line:} the same checks, but run by typing a command instead of
+clicking.
+\end{plainbox}
+
+This is for running big batches without a browser. You type something like
+``check rows 2 to 301 of this file, including the paid checks,'' and it writes
+out a new Excel file with every applicant annotated (their follower counts,
+verdicts, and notes) and a tick-box ticked for the ones who passed.
+
+It reads the same secret keys, uses the same brain, and supports extra options
+like adding your own country-exclusion rules on the fly.
+
+% ---------------------------------
+\subsection{vetting/config.py — the settings/rulebook}
+\begin{plainbox}
+\textbf{One line:} every ``magic number'' and rule lives here, in one place.
+\end{plainbox}
+
+Instead of scattering important numbers throughout the code, they all sit here
+so they're easy to find and change. For example:
+\begin{itemize}
+  \item How many followers count as ``enough'' (Instagram/TikTok: 1,000;
+  LinkedIn: 800).
+  \item How many views a YouTube video needs (100,000).
+  \item The list of \textbf{excluded countries}.
+  \item Which spreadsheet columns to \textbf{hide} from the final output (form
+  junk, internal scoring, personal data).
+  \item The policy that a person qualifies if they pass \emph{any one} platform,
+  and that the paid checks stop early once one passes (to save money).
+\end{itemize}
+
+\begin{analogybox}
+\textbf{Why this is good practice:} if the company later says ``actually, make
+the YouTube bar 200,000 views,'' you change \emph{one number in one file} — you
+never go hunting through the logic.
+\end{analogybox}
+
+% ---------------------------------
+\subsection{vetting/models.py — the vocabulary}
+\begin{plainbox}
+\textbf{One line:} defines the standard ``shapes'' of data everyone else uses.
+\end{plainbox}
+
+This file doesn't \emph{do} anything on its own; it defines the labels and
+containers the rest of the app passes around, so everyone speaks the same
+language. The important ones:
+\begin{itemize}
+  \item \term{Verdict} — the five possible outcomes: PASS, FAIL, REVIEW,
+  SKIPPED, EXCLUDED.
+  \item \term{Handle} — a cleaned-up social account (the tidy username plus the
+  proper profile URL, and whether it could be resolved).
+  \item \term{PlatformResult} — the result for one platform for one person
+  (follower count, average views, and the verdict).
+  \item \term{RowResult} — everything computed for one applicant across all four
+  platforms plus the overall verdict.
+  \item \term{ExclusionRule} — a rule describing which country values to drop.
+\end{itemize}
+
+\begin{analogybox}
+\textbf{Analogy:} this is the ``form template'' everyone fills in. It guarantees
+that when one part of the app says ``here's a result,'' every other part knows
+exactly what fields to expect.
+\end{analogybox}
+
+% ---------------------------------
+\subsection{vetting/normalize.py — the link cleaner}
+\begin{plainbox}
+\textbf{One line:} turns messy, human-typed links into tidy, standard ones.
+\end{plainbox}
+
+People type their accounts in a hundred inconsistent ways: ``@me'',
+``www.instagram.com/me/'', ``MY\_HANDLE'', or just ``yes'' (junk). This file's
+whole job is to make sense of that mess for each platform and produce a clean
+result:
+\begin{itemize}
+  \item A usable handle plus a proper profile link (status: \term{OK}), or
+  \item Nothing there / junk (status: \term{MISSING}), or
+  \item Present but too ambiguous to use automatically — e.g. a ``link tree''
+  page that could point anywhere (status: \term{UNRESOLVABLE}, meaning a human
+  should check).
+\end{itemize}
+
+It also decides, from the country text, whether the person should be screened
+out. Crucially, this file never touches the internet — it just cleans text — so
+it's fast and easy to test.
+
+% ---------------------------------
+\subsection{vetting/metrics.py — the measuring stick}
+\begin{plainbox}
+\textbf{One line:} the pure math of ``do these numbers pass the bar?''
+\end{plainbox}
+
+Once we have follower counts and video views, this file applies the actual
+thresholds and gives a verdict. Two clever details worth mentioning:
+\begin{itemize}
+  \item It uses the \textbf{median} (middle value) of recent videos, not the
+  average, so one freak viral hit — or one flop — doesn't distort the picture.
+  \item It only looks at \textbf{recent} videos and ignores brand-new ones that
+  haven't had time to gather views, so newer creators aren't judged unfairly.
+  \item If it genuinely can't tell (e.g. an account with no videos), it returns
+  \term{REVIEW} rather than guessing a FAIL.
+\end{itemize}
+
+LinkedIn is judged on follower count alone, because LinkedIn post data is too
+unreliable across sources to trust.
+
+% ---------------------------------
+\subsection{vetting/exclusions.py — the country gate}
+\begin{plainbox}
+\textbf{One line:} checks a person's country against the exclusion rules.
+\end{plainbox}
+
+A tiny file. It takes the country value and the list of rules, and returns the
+first rule that ``fires'' (matches), or nothing if the person is allowed
+through. It runs \emph{first} in the pipeline so no money is ever spent checking
+someone who was going to be excluded anyway.
+
+% ---------------------------------
+\subsection{vetting/pipeline.py — the conductor}
+\begin{plainbox}
+\textbf{One line:} runs the full check for one person, in the right order.
+\end{plainbox}
+
+If the other files are musicians, this is the \term{conductor} that tells them
+when to play. For a single applicant it:
+\begin{enumerate}
+  \item Runs the country screen — and stops right there if excluded.
+  \item Cleans all four links (via \file{normalize.py}).
+  \item Checks YouTube (free, always).
+  \item Checks the paid platforms in order — Instagram, TikTok, LinkedIn —
+  stopping early once one passes.
+  \item Combines everything into one overall verdict.
+\end{enumerate}
+
+\begin{analogybox}
+\textbf{Key design point:} any of the outside connections can be ``switched
+off'' (set to nothing). If, say, there's no LinkedIn key, that step is simply
+skipped instead of crashing. This is what lets you do a free ``dry run''
+without paying for anything.
+\end{analogybox}
+
+% ---------------------------------
+\subsection{vetting/youtube.py — the YouTube checker}
+\begin{plainbox}
+\textbf{One line:} asks YouTube's official (free) service for a channel's video
+views.
+\end{plainbox}
+
+It looks up the channel, finds its recent uploads, and checks whether any single
+video is above the view threshold. It deliberately uses the ``cheap'' parts of
+YouTube's service to stay within the free usage limits. If YouTube can't be
+reached or the channel isn't found, it returns \term{REVIEW} instead of
+failing the whole run.
+
+% ---------------------------------
+\subsection{vetting/scrapecreators.py — the Instagram \& TikTok checker}
+\begin{plainbox}
+\textbf{One line:} the paid service that fetches Instagram and TikTok numbers.
+\end{plainbox}
+
+Instagram and TikTok don't give this data away freely, so the app pays a service
+called \term{ScrapeCreators} to fetch follower counts and recent video views.
+This file knows the exact shape of that service's responses and turns them into
+the app's standard \term{PlatformResult}. If the account is deleted, private, or
+the response is broken, it safely returns \term{REVIEW} rather than crashing.
+
+% ---------------------------------
+\subsection{vetting/brightdata.py — the LinkedIn checker}
+\begin{plainbox}
+\textbf{One line:} a different paid service, used only for LinkedIn followers.
+\end{plainbox}
+
+LinkedIn is hard to read. The earlier service (ScrapeCreators) came back empty
+about 89\% of the time on LinkedIn, so LinkedIn was moved to a stronger service
+called \term{Bright Data}, which recovers most profiles. This file sends one
+profile link, reads back the follower count, and judges it against the LinkedIn
+bar (800 followers). Same safety net: anything unexpected becomes \term{REVIEW}.
+
+% ---------------------------------
+\subsection{vetting/frames.py — the results builder \& colourer}
+\begin{plainbox}
+\textbf{One line:} turns raw results into the pretty, coloured table and the
+downloadable Excel file.
+\end{plainbox}
+
+This is where the output people actually see gets built. It:
+\begin{itemize}
+  \item Figures out which spreadsheet columns are which (even if their order or
+  exact names differ).
+  \item Keeps \emph{only} the passing rows.
+  \item Picks each row's colour based on which platform passed (and yellow for
+  multiple).
+  \item Adds the leading \textbf{``Approved''} column (a clickable link to the
+  qualifying profile) and a \textbf{``Row''} column showing the original
+  spreadsheet row number.
+  \item Hides the junk/personal columns listed in the config.
+  \item Builds both the on-screen coloured table \emph{and} the matching
+  downloadable Excel workbook.
+\end{itemize}
+
+% ---------------------------------
+\subsection{vetting/sheet\_io.py — the Excel reader/writer (CLI)}
+\begin{plainbox}
+\textbf{One line:} reads rows from and writes results back into Excel, for the
+command-line version.
+\end{plainbox}
+
+The command-line tool needs to open the original workbook, read the right
+columns, and later write all the computed numbers and verdicts back into new
+columns of a copy — ticking a checkbox for the clear passes. This file handles
+all that Excel plumbing, kept separate from the logic so the logic stays clean
+and testable.
+
+% ---------------------------------
+\subsection{vetting/history.py — the memory (past runs)}
+\begin{plainbox}
+\textbf{One line:} saves each run online so it survives closing the browser.
+\end{plainbox}
+
+Uses an online database service called \term{Supabase}. Every finished run is
+stored two ways: the full result (so it can be re-shown exactly) and a small
+summary row (date, how many were vetted, how many passed) that powers the fast
+history list in the sidebar. It's completely optional — if Supabase isn't set
+up, the app just runs without saving history.
+
+\begin{plainbox}
+\textbf{The whole system in one breath:} \file{app.py}/\file{run.py} take the
+input $\rightarrow$ \file{pipeline.py} conducts the check for each row
+$\rightarrow$ \file{exclusions.py}, \file{normalize.py}, \file{metrics.py} apply
+the rules $\rightarrow$ \file{youtube.py}, \file{scrapecreators.py},
+\file{brightdata.py} fetch the real numbers $\rightarrow$ \file{frames.py}
+paints the results $\rightarrow$ \file{history.py} remembers them. And
+\file{config.py} + \file{models.py} quietly hold the settings and the shared
+vocabulary underneath it all.
+\end{plainbox}
+
+\newpage
+
+% ============ PART 3: THE JOURNEY OF ONE RECORD ============
+\section{The Journey of One Record}
+
+This section follows \emph{one single applicant} through every file, in order,
+so you can see exactly how the files hand work to each other. It's the ``end to
+end'' story of one row.
+
+\subsection{Meet our example applicant}
+
+Let's say row 42 of the uploaded spreadsheet contains a person we'll call
+\textbf{Jane}:
+
+\begin{plainbox}
+\begin{tabular}{ll}
+\textbf{YouTube:} & \texttt{@janedoe} \\
+\textbf{Instagram:} & \texttt{www.instagram.com/janedoe/} \\
+\textbf{TikTok:} & \texttt{(blank)} \\
+\textbf{LinkedIn:} & \texttt{(blank)} \\
+\textbf{Country:} & \texttt{Spain} \\
+\end{tabular}
+\end{plainbox}
+
+Now watch what each file does to Jane's record, one hop at a time.
+
+\subsection{Hop 1 — \file{app.py}: the record enters the system}
+
+The user uploads the spreadsheet and clicks ``Run.'' \file{app.py}:
+\begin{itemize}
+  \item Reads the whole Excel file into a table in memory.
+  \item Works out which column is which (asks \file{frames.py} to match
+  ``YouTube,'' ``Instagram,'' etc. to the real headers).
+  \item Sees the row slider covers row 42, so Jane is included.
+  \item Builds the outside connections (YouTube, ScrapeCreators, Bright Data)
+  using the secret keys.
+  \item Hands the selected rows over to \file{frames.py} to be processed.
+\end{itemize}
+\textbf{Jane's record right now:} still raw, messy text — exactly as typed.
+
+\subsection{Hop 2 — \file{frames.py}: one row is prepared and passed on}
+
+\file{frames.py} goes row by row. For Jane it:
+\begin{itemize}
+  \item Tags her with her original position (\textbf{row index 42}) so she can
+  be matched back to the spreadsheet later.
+  \item Converts any empty cells (her blank TikTok and LinkedIn) from
+  spreadsheet-``empty'' into a clean ``nothing here.''
+  \item Passes Jane's record to \file{pipeline.py} — the conductor — to actually
+  run the checks.
+\end{itemize}
+\textbf{Jane's record right now:} a tidy package with her four links, her
+country, and her row number.
+
+\subsection{Hop 3 — \file{pipeline.py}: the conductor takes over}
+
+This is the heart of the journey. \file{pipeline.py} runs these steps
+\emph{in this exact order} for Jane:
+
+\textbf{Step 3a — Country screen (asks \file{exclusions.py}).}
+It sends ``Spain'' to \file{exclusions.py}, which checks it against the excluded
+list in \file{config.py}. Spain is \emph{not} excluded, so Jane continues.
+(If she'd said ``India,'' the story would \textbf{end here} — verdict
+\term{EXCLUDED}, and not a cent spent checking her socials.)
+
+\textbf{Step 3b — Clean the links (asks \file{normalize.py}).}
+Each of Jane's four links is sent to \file{normalize.py}:
+\begin{itemize}
+  \item \texttt{@janedoe} (YouTube) $\rightarrow$ a clean YouTube reference,
+  status \term{OK}.
+  \item \texttt{www.instagram.com/janedoe/} $\rightarrow$ handle
+  \texttt{janedoe} + proper URL, status \term{OK}.
+  \item blank TikTok $\rightarrow$ status \term{MISSING}.
+  \item blank LinkedIn $\rightarrow$ status \term{MISSING}.
+\end{itemize}
+The proper profile URLs are saved so the results table can link to them later.
+
+\textbf{Step 3c — Check YouTube (asks \file{youtube.py}).}
+Because YouTube is free, it always runs. See Hop 4.
+
+\textbf{Step 3d — Check the paid platforms, in order.}
+Instagram first (Hop 5), then TikTok, then LinkedIn. But TikTok and LinkedIn are
+\term{MISSING} for Jane, so they're marked \term{SKIPPED} without any API call.
+And thanks to the money-saving rule, if Instagram \emph{passes}, the app
+wouldn't bother with the rest anyway.
+
+\textbf{Step 3e — Combine (uses the rule in \file{config.py}).}
+It gathers all four platform results and decides the overall verdict. Because
+the policy is ``pass on \emph{any one} platform,'' a single PASS makes Jane an
+overall \term{PASS}.
+
+\subsection{Hop 4 — \file{youtube.py}: the free check runs}
+
+\file{youtube.py} takes Jane's clean YouTube reference and asks YouTube's
+official service:
+\begin{itemize}
+  \item Find her channel $\rightarrow$ find her recent uploads $\rightarrow$
+  read each video's view count.
+  \item Does any video clear 100,000 views? Say her best video has 40,000.
+  That's below the bar $\rightarrow$ verdict \term{FAIL} for YouTube.
+\end{itemize}
+It hands back a neat \term{PlatformResult} (the shape defined in
+\file{models.py}) saying: handle janedoe, best views 40,000, verdict FAIL.
+
+\subsection{Hop 5 — \file{scrapecreators.py} + \file{metrics.py}: the paid check}
+
+For Instagram, \file{pipeline.py} calls \file{scrapecreators.py}:
+\begin{itemize}
+  \item It pays the ScrapeCreators service and gets back Jane's Instagram data:
+  say \textbf{8,500 followers} and her recent videos' view counts.
+  \item It cleans up that raw response and passes the numbers to
+  \file{metrics.py} — the measuring stick.
+\end{itemize}
+
+\file{metrics.py} then applies the rules:
+\begin{itemize}
+  \item 8,500 followers is above the 1,000 bar. Good so far.
+  \item It takes the \textbf{median} of her recent video views — say 6,000 —
+  which is above the 3,000 view bar.
+  \item Both bars cleared $\rightarrow$ verdict \term{PASS} for Instagram.
+\end{itemize}
+Back comes another \term{PlatformResult}: handle janedoe, 8,500 followers,
+6,000 avg views, verdict PASS.
+
+\begin{analogybox}
+\textbf{Note:} LinkedIn would use \file{brightdata.py} instead of
+ScrapeCreators here — same idea, different service — but Jane has no LinkedIn,
+so that file never gets involved for her.
+\end{analogybox}
+
+\subsection{Hop 6 — back in \file{pipeline.py}: the final verdict}
+
+Now the conductor has all four results for Jane:
+\begin{plainbox}
+\begin{tabular}{ll}
+YouTube: & FAIL (40,000 views) \\
+Instagram: & \textbf{PASS} (8,500 followers) \\
+TikTok: & SKIPPED (no account) \\
+LinkedIn: & SKIPPED (no account) \\
+\end{tabular}
+\end{plainbox}
+Rule: pass on \emph{any one} platform. Instagram passed $\rightarrow$
+\textbf{overall verdict = PASS}. Jane is a qualified applicant.
+
+\subsection{Hop 7 — \file{frames.py} again: Jane becomes a coloured row}
+
+The finished results for every applicant come back to \file{frames.py}, which
+builds the output:
+\begin{itemize}
+  \item Jane passed, so she's \textbf{kept} (people who failed are dropped from
+  the view).
+  \item Only Instagram passed, so her row is coloured \textbf{purple}.
+  \item An ``Approved'' column is added with a clickable link to her Instagram.
+  \item A ``Row'' column shows \textbf{42} — her original spreadsheet row.
+  \item The junk/personal columns are stripped out.
+\end{itemize}
+It builds both the on-screen coloured table \emph{and} a matching downloadable
+Excel file.
+
+\subsection{Hop 8 — \file{history.py}: the run is remembered}
+
+Finally, \file{app.py} asks \file{history.py} to save the whole run to the
+online database, so even after the browser closes, this run — including Jane's
+purple passing row — can be re-opened later from the sidebar.
+
+\subsection{The one-record flow at a glance}
+
+\begin{plainbox}
+\small
+\textbf{Jane's raw row} \\
+$\rightarrow$ \file{app.py} (read file, build connections) \\
+$\rightarrow$ \file{frames.py} (tag with row 42, tidy cells) \\
+$\rightarrow$ \file{pipeline.py} (conduct the checks) \\
+\hspace{1.2em}$\rightarrow$ \file{exclusions.py} (Spain? allowed $\checkmark$) \\
+\hspace{1.2em}$\rightarrow$ \file{normalize.py} (clean the 4 links) \\
+\hspace{1.2em}$\rightarrow$ \file{youtube.py} (YouTube: FAIL) \\
+\hspace{1.2em}$\rightarrow$ \file{scrapecreators.py} + \file{metrics.py} (Instagram: PASS) \\
+\hspace{1.2em}$\rightarrow$ combine $\Rightarrow$ overall \textbf{PASS} \\
+$\rightarrow$ \file{frames.py} (purple row, Approved link, row 42) \\
+$\rightarrow$ \file{history.py} (saved online) \\
+$\rightarrow$ \textbf{shown to the user + downloadable} \\[4pt]
+\emph{(\file{config.py} supplied every threshold and rule along the way;
+\file{models.py} supplied the shared ``result'' shapes passed between files.)}
+\end{plainbox}
+
+\newpage
+
+% ============ PART 4: SAFEGUARD ============
+\section{What If the API Credits Run Out Mid-Run?}
+
+This is a real risk worth understanding — and the app has a specific safeguard
+for it. It's also a great thing to talk about in an interview, because it shows
+you thought about failure, not just the happy path.
+
+\subsection{The problem (what would happen without the safeguard)}
+
+When an API runs out of credits it doesn't return data — it returns an error
+code. The important ones are:
+\begin{itemize}
+  \item \textbf{402 Payment Required} — you're out of credits.
+  \item \textbf{429 Too Many Requests} — you're being rate-limited.
+  \item \textbf{401 / 403} — your key is rejected or over quota.
+\end{itemize}
+
+Every checker safely catches errors so one bad profile can't crash a run of
+3,000 people. But that safety net created a nastier problem:
+
+\begin{analogybox}
+\textbf{The silent-failure trap:} if the credits died at row 50 of 500, every
+remaining person would be marked \term{REVIEW}. \term{REVIEW} isn't
+\term{PASS}, so they'd all quietly \emph{disappear} from the results table. The
+run would show a green progress bar, finish ``successfully,'' and just look like
+a run where fewer people qualified. \textbf{You'd have no idea 450 people were
+never actually checked.}
+\end{analogybox}
+
+\subsection{The safeguard (what happens now)}
+
+A new file, \file{vetting/quota.py}, acts as a \term{watchdog}. It works like
+this:
+
+\begin{enumerate}[leftmargin=1.6em, itemsep=4pt]
+  \item Each checker now records \emph{why} a lookup failed — specifically the
+  error code the API gave back.
+  \item The watchdog tells apart two very different failures:
+  \begin{itemize}
+    \item ``\textbf{This profile is private/deleted}'' (a 404) — normal, keep
+    going.
+    \item ``\textbf{Your plan is the problem}'' (401/402/403/429) — dangerous.
+  \end{itemize}
+  \item It counts these plan-failures \textbf{consecutively, per platform}. If
+  Instagram fails this way \textbf{3 times in a row}, the run stops immediately.
+  \item Because it counts \emph{consecutive} failures, one random blip doesn't
+  stop anything — a single successful lookup resets the counter. Only a real,
+  persistent outage triggers the abort.
+  \item Counting is \textbf{per platform}, so a dead Instagram key doesn't stop
+  the run because of unrelated LinkedIn hiccups.
+\end{enumerate}
+
+\subsection{The crucial part: nothing already earned is lost}
+
+When the watchdog stops the run, it doesn't throw the work away. It carries all
+the results gathered so far with it, so:
+
+\begin{itemize}
+  \item A clear red banner appears: \emph{``Run stopped early — API credits
+  exhausted''}, naming the platform and the error code.
+  \item \textbf{Everyone who already passed is still shown}, still colour-coded,
+  still with their clickable profile links.
+  \item \textbf{The download button still works} — you get the Excel file of the
+  passers found before the credits ran out.
+  \item The run is saved to history marked \textbf{``(partial)''} so you can
+  tell later that it wasn't a complete pass.
+  \item The banner tells you which row it stopped at, so you can top up the key
+  and re-run from exactly there instead of starting over and paying twice.
+\end{itemize}
+
+\subsection{A worked example}
+
+A real test of this behaviour: a 500-row run where the Instagram plan dies after
+the first two people.
+
+\begin{plainbox}
+\small
+\textbf{Before the safeguard:} all 500 rows get called. Rows 3--500 are all
+marked REVIEW. Table shows 2 passers. Looks like a normal, finished run. \\[6pt]
+\textbf{With the safeguard:}
+\begin{itemize}[topsep=2pt]
+  \item Rows 1--2 pass and are kept.
+  \item Rows 3, 4, 5 fail with 402 $\rightarrow$ three in a row $\rightarrow$
+  \textbf{run stops at row 5}, not row 500.
+  \item Red banner: \emph{``instagram API returned HTTP 402 three times in a
+  row --- the key is out of credits\ldots Stopped after 5 rows.''}
+  \item The 2 passing rows are still displayed and downloadable.
+\end{itemize}
+\end{plainbox}
+
+\subsection{Why stopping early is itself valuable}
+
+Two benefits beyond honesty:
+\begin{itemize}
+  \item \textbf{It saves time.} It stopped after 5 rows instead of pointlessly
+  hammering a dead API 500 times.
+  \item \textbf{It protects the money-saving logic.} Normally the app skips the
+  remaining paid platforms once one passes. But when everything errors, nothing
+  ever ``passes,'' so it would keep calling \emph{all three} paid services for
+  every remaining row — the most wasteful possible behaviour, exactly when
+  something is already wrong.
+\end{itemize}
+
+\subsection{The command-line version too}
+
+\file{run.py} gets the same protection: it stops, writes the partial results to
+the Excel file anyway, logs a loud error saying how many rows were actually
+done, and exits with a \textbf{non-zero exit code} — which is the standard way
+to tell an automated script ``this job did not fully succeed.''
+
+\vspace{1cm}
+\begin{center}
+\color{inkgray}\emph{End of guide.}
+\end{center}
+
+\end{document}

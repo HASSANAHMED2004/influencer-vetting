@@ -18,6 +18,7 @@ from openpyxl.styles import Font, PatternFill
 from .config import EXCLUDED_OUTPUT_COLUMNS
 from .models import ExclusionRule, RowResult, Verdict
 from .pipeline import process_row
+from .quota import QuotaGuard
 
 
 def is_excluded_column(header: object) -> bool:
@@ -117,8 +118,14 @@ def run_over_dataframe(
     disabled_platforms: Collection[str] = (),
     progress: Callable[[float], None] | None = None,
 ) -> list[RowResult]:
-    """Run the vetting pipeline over every row, in order. Returns aligned results."""
+    """Run the vetting pipeline over every row, in order. Returns aligned results.
+
+    Raises ``QuotaExhausted`` (carrying the results gathered so far) if an API
+    key runs out of credits mid-run, rather than marking every remaining row
+    REVIEW and finishing as if nothing were wrong.
+    """
     results: list[RowResult] = []
+    guard = QuotaGuard()
     total = max(len(df), 1)
     for done, (position, row) in enumerate(df.iterrows(), start=1):
         adapter = _DFRow(
@@ -129,11 +136,13 @@ def run_over_dataframe(
             linkedin=_cell(row[colmap["linkedin"]]),
             country=_cell(row[colmap["country"]]),
         )
-        results.append(process_row(
+        result = process_row(
             adapter, youtube_client=youtube_client,
             social_client=social_client, linkedin_client=linkedin_client,
             exclusion_rules=exclusion_rules, disabled_platforms=disabled_platforms,
-        ))
+        )
+        results.append(result)
+        guard.observe(result, results)  # aborts the run if a plan is exhausted
         if progress is not None:
             progress(done / total)
     return results
